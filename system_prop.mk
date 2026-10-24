@@ -1,7 +1,6 @@
 # USB / ADB
 PRODUCT_PROPERTY_OVERRIDES += \
-    persist.sys.usb.config=adb \
-    ro.adb.secure=0
+    persist.sys.usb.config=adb
 
 # aDSP sensors
 ## max rate
