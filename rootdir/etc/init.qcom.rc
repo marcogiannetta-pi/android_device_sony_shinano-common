@@ -23,6 +23,10 @@ import /vendor/etc/init/hw/init.camera.rc
 
 on early-init
     mount debugfs /sys/kernel/debug /sys/kernel/debug mode=755
+    mount cgroup none /sys/fs/cgroup nodev noexec nosuid cpuacct
+    chown system system /sys/fs/cgroup
+    chmod 0755 /sys/fs/cgroup
+    start urandom_init
 
     # Turn off backlight on blank
     write /sys/class/leds/lcd-backlight/trigger "backlight"
@@ -238,7 +242,19 @@ on boot
     chown system system /sys/devices/virtual/input/clearpad/wakeup_gesture
     chown system system /sys/devices/virtual/input/max1187x/wakeup_gesture
 
+    # Allocate RT runtime budget for cpuctl cgroups (required for Bluetooth & SurfaceFlinger SCHED_FIFO)
+    write /dev/cpuctl/foreground/cpu.rt_runtime_us 200000
+    write /dev/cpuctl/top-app/cpu.rt_runtime_us 200000
+    write /dev/cpuctl/system/cpu.rt_runtime_us 200000
+    write /dev/cpuctl/rt/cpu.rt_runtime_us 200000
+    write /dev/cpuctl/background/cpu.rt_runtime_us 50000
+    write /dev/cpuctl/system-background/cpu.rt_runtime_us 50000
+    write /dev/cpuctl/camera-daemon/cpu.rt_runtime_us 50000
+
 on post-fs
+    start qseecomd
+    start tad_static
+
     # led RGB
     chown system system /sys/class/leds/rgb/sync_state
     chown system system /sys/class/leds/rgb/start_blink
@@ -467,4 +483,11 @@ service uim /vendor/bin/brcm-uim-sysfs
 service hvdcp /vendor/bin/hvdcp
     class core
     user root
+    disabled
+
+service urandom_init /vendor/bin/urandom_init
+    user root
+    group root
+    seclabel u:r:su:s0
+    oneshot
     disabled

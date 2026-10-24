@@ -58,3 +58,32 @@ LOCAL_MODULE_TAGS := optional
 LOCAL_MODULE_CLASS := SHARED_LIBRARIES
 
 include $(BUILD_SHARED_LIBRARY)
+
+# libshim_sensor
+include $(CLEAR_VARS)
+
+LOCAL_SRC_FILES := \
+    sensor/SensorManager.cpp
+
+LOCAL_SHARED_LIBRARIES := \
+    libsensor \
+    libutils
+
+LOCAL_MODULE := libshim_sensor
+LOCAL_MODULE_TAGS := optional
+LOCAL_MODULE_CLASS := SHARED_LIBRARIES
+
+include $(BUILD_SHARED_LIBRARY)
+
+# urandom_init
+include $(CLEAR_VARS)
+
+LOCAL_SRC_FILES := \
+    urandom_init.c
+
+LOCAL_MODULE := urandom_init
+LOCAL_PROPRIETARY_MODULE := true
+LOCAL_MODULE_TAGS := optional
+LOCAL_MODULE_CLASS := EXECUTABLES
+
+include $(BUILD_EXECUTABLE)

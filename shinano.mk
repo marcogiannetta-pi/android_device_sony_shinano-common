@@ -50,7 +50,9 @@ PRODUCT_COPY_FILES += \
 
 # Camera
 PRODUCT_PACKAGES += \
-    libshim_camera
+    libshim_camera \
+    libshim_sensor \
+    urandom_init
 
 PRODUCT_PACKAGES += \
     tad_static

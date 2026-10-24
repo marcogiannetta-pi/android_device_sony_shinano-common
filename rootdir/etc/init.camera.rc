@@ -51,7 +51,7 @@ on post-fs-data
 
 on post-fs-data
     # SONY: Start early TA-users
-    mkdir /data/etc 0755 root shell
+    mkdir /data/etc 0775 system shell
     start taimport
 
     # SONY: Create dir for Widevine keybox
@@ -71,8 +71,8 @@ on post-fs-data
     # taimport ready, use this as trigger for multi-cdf-symlinker
 
 service taimport /vendor/bin/taimport
-    user system
-    group system
+    user root
+    group system shell
     oneshot
     disabled
 

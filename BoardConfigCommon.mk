@@ -23,7 +23,7 @@ BOARD_VENDOR_PLATFORM := shinano
 PRODUCT_PLATFORM := shinano
 
 # Kernel
-BOARD_KERNEL_CMDLINE := androidboot.hardware=qcom msm_rtb.filter=0x37 ehci-hcd.park=3 dwc3.maximum_speed=high dwc3_msm.prop_chg_detect=Y vmalloc=300M
+BOARD_KERNEL_CMDLINE := androidboot.hardware=qcom msm_rtb.filter=0x37 ehci-hcd.park=3 dwc3.maximum_speed=high dwc3_msm.prop_chg_detect=Y vmalloc=300M androidboot.selinux=permissive
 
 # Audio
 USE_CUSTOM_AUDIO_POLICY := 1
