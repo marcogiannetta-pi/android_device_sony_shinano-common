@@ -20,32 +20,17 @@ LOCAL_PATH := $(call my-dir)
 include $(CLEAR_VARS)
 
 LOCAL_SRC_FILES := \
-    ui/GraphicBuffer.cpp \
-    ui/GraphicBufferAllocator.cpp \
-    ui/GraphicBufferMapper.cpp \
+    ui/GraphicBufferShim.cpp \
     utils/Looper.cpp \
     utils/VectorImpl.cpp
 
 LOCAL_C_INCLUDES := \
     $(LOCAL_PATH)/include \
-    system/core/libutils \
-    system/core/libgrallocusage/include \
-    frameworks/native/libs/vr/libdvr/include
+    system/core/libutils
 
 LOCAL_SHARED_LIBRARIES := \
-    android.hardware.graphics.allocator@2.0 \
-    android.hardware.graphics.allocator@3.0 \
-    android.hardware.graphics.allocator@4.0 \
-    android.hardware.graphics.common@1.2 \
-    android.hardware.graphics.mapper@2.0 \
-    android.hardware.graphics.mapper@2.1 \
-    android.hardware.graphics.mapper@3.0 \
-    android.hardware.graphics.mapper@4.0 \
     libbase \
     libcutils \
-    libhardware \
-    libhidlbase \
-    libsync \
     libui \
     libutils \
     liblog
