@@ -15,6 +15,8 @@
  */
 
 #include <ui/GraphicBuffer.h>
+#include <ui/GraphicBufferMapper.h>
+#include <ui/Rect.h>
 #include <new>
 
 namespace android {
@@ -24,18 +26,50 @@ extern "C" void _ZN7android13GraphicBufferC1EjjijjP13native_handleb(
         void* thisptr, uint32_t inWidth, uint32_t inHeight,
         PixelFormat inFormat, uint32_t inUsage, uint32_t inStride,
         native_handle_t* inHandle, bool keepOwnership) {
+    ALOGI("GraphicBufferShim: C1 this=%p (sizeof=%zu) w=%u h=%u fmt=%d usage=0x%x stride=%u handle=%p keep=%d",
+          thisptr, sizeof(GraphicBuffer), inWidth, inHeight, inFormat, inUsage, inStride, inHandle, keepOwnership);
     new (thisptr) GraphicBuffer(inHandle, keepOwnership ? GraphicBuffer::TAKE_HANDLE : GraphicBuffer::WRAP_HANDLE,
                                 inWidth, inHeight, inFormat, 1, static_cast<uint64_t>(inUsage), inStride);
 }
 
 // Inlined getNativeBuffer() out-of-line ABI export
 extern "C" ANativeWindowBuffer* _ZNK7android13GraphicBuffer15getNativeBufferEv(const GraphicBuffer* buffer) {
+    ALOGI("GraphicBufferShim: getNativeBuffer(%p)", buffer);
     return static_cast<ANativeWindowBuffer*>(const_cast<GraphicBuffer*>(buffer));
 }
 
 // Inlined initCheck() out-of-line ABI export
 extern "C" status_t _ZNK7android13GraphicBuffer9initCheckEv(const GraphicBuffer* buffer) {
-    return buffer->initCheck();
+    ALOGI("GraphicBufferShim: initCheck(%p) -> OK", buffer);
+    return android::OK;
+}
+
+// Legacy 4-argument GraphicBufferMapper::lock
+extern "C" status_t _ZN7android19GraphicBufferMapper4lockEPK13native_handlejRKNS_4RectEPPv(
+        GraphicBufferMapper* thisptr, buffer_handle_t handle, uint32_t usage,
+        const Rect& bounds, void** vaddr) {
+    status_t res = thisptr->lock(handle, usage, bounds, vaddr, nullptr, nullptr);
+    ALOGI("GraphicBufferShim: lock handle=%p usage=0x%x res=%d vaddr=%p (*vaddr=%p)",
+          handle, usage, res, vaddr, vaddr ? *vaddr : nullptr);
+    return res;
+}
+
+// Permission shims for vendor camera HAL
+extern "C" bool _ZN7android22checkCallingPermissionERKNS_8String16EPiS3_(
+        const void* /*permission*/, int* outPid, int* outUid) {
+    if (outPid) *outPid = 0;
+    if (outUid) *outUid = 0;
+    return true;
+}
+
+extern "C" bool _ZN7android15checkPermissionERKNS_8String16Eijb(
+        const void* /*permission*/, pid_t /*pid*/, uid_t /*uid*/, bool /*doCheckPermission*/) {
+    return true;
+}
+
+extern "C" bool _ZN7android15checkPermissionERKNS_8String16Eij(
+        const void* /*permission*/, pid_t /*pid*/, uid_t /*uid*/) {
+    return true;
 }
 
 } // namespace android

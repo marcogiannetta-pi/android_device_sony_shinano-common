@@ -104,4 +104,5 @@ on property:dev.bootcomplete=1
     rm /data/system/perfd/default_values
     setprop sys.io.scheduler "bfq"
     setprop vendor.post_boot.parsed 1
-    start mpdecision
+    # Do not start mpdecision: CPU core offlining crashes SLUB allocator in Linux 3.4
+    # start mpdecision
