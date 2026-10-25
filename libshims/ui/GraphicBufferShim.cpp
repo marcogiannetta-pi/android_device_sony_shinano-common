@@ -44,16 +44,6 @@ extern "C" status_t _ZNK7android13GraphicBuffer9initCheckEv(const GraphicBuffer*
     return android::OK;
 }
 
-// Legacy 4-argument GraphicBufferMapper::lock
-extern "C" status_t _ZN7android19GraphicBufferMapper4lockEPK13native_handlejRKNS_4RectEPPv(
-        GraphicBufferMapper* thisptr, buffer_handle_t handle, uint32_t usage,
-        const Rect& bounds, void** vaddr) {
-    status_t res = thisptr->lock(handle, usage, bounds, vaddr, nullptr, nullptr);
-    ALOGI("GraphicBufferShim: lock handle=%p usage=0x%x res=%d vaddr=%p (*vaddr=%p)",
-          handle, usage, res, vaddr, vaddr ? *vaddr : nullptr);
-    return res;
-}
-
 // Permission shims for vendor camera HAL
 extern "C" bool _ZN7android22checkCallingPermissionERKNS_8String16EPiS3_(
         const void* /*permission*/, int* outPid, int* outUid) {
