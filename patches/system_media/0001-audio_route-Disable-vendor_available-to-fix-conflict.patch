@@ -1,0 +1,23 @@
+diff --git a/audio_route/Android.bp b/audio_route/Android.bp
+index 7ba7b6a2..ee84ae74 100644
+--- a/audio_route/Android.bp
++++ b/audio_route/Android.bp
+@@ -8,7 +8,7 @@ package {
+ 
+ cc_defaults {
+     name: "libaudioroute_defaults",
+-    vendor_available: true,
++    vendor_available: false,
+     host_supported: true,
+     srcs: ["audio_route.c"],
+     export_include_dirs: ["include"],
+@@ -27,9 +27,6 @@ cc_defaults {
+ cc_library_shared {
+     name: "libaudioroute",
+     defaults: ["libaudioroute_defaults"],
+-    vndk: {
+-        enabled: true,
+-    },
+     shared_libs: [
+         "libtinyalsa",
+     ],

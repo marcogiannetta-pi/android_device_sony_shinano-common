@@ -1,28 +1,8 @@
-From b49cff02542c4ba3c304dd00164333c8ab1de02a Mon Sep 17 00:00:00 2001
-From: mgiannetta <marcogiannetta96@gmail.com>
-Date: Sun, 25 Oct 2026 09:51:15 +0100
-Subject: [PATCH] Trebuchet: Fix compile issues
-
-Change-Id: If552c18e21231273fc8d9deec68ab704c55e6570
----
- .../quickstep/QuickstepProcessInitializer.java        | 11 ++---------
- .../src/com/android/quickstep/SystemUiProxy.java      |  9 +--------
- 2 files changed, 3 insertions(+), 17 deletions(-)
-
 diff --git a/quickstep/src/com/android/quickstep/QuickstepProcessInitializer.java b/quickstep/src/com/android/quickstep/QuickstepProcessInitializer.java
-index 50066bb4d3..2391703386 100644
+index 61f6be287a..a8c9c12dc1 100644
 --- a/quickstep/src/com/android/quickstep/QuickstepProcessInitializer.java
 +++ b/quickstep/src/com/android/quickstep/QuickstepProcessInitializer.java
-@@ -67,7 +67,7 @@ public class QuickstepProcessInitializer extends MainProcessInitializer {
-         ThreadedRenderer.setContextPriority(
-                 ThreadedRenderer.EGL_CONTEXT_PRIORITY_HIGH_IMG);
- 
--        setupImageDecoder(context);
-+        // setupImageDecoder(context);
- 
-         // Enable binder tracing on system server for calls originating from Launcher
-         try {
-@@ -78,13 +78,6 @@ public class QuickstepProcessInitializer extends MainProcessInitializer {
+@@ -77,14 +77,7 @@ public class QuickstepProcessInitializer extends MainProcessInitializer {
      }
  
      private void setupImageDecoder(Context context) {
@@ -36,12 +16,13 @@ index 50066bb4d3..2391703386 100644
 -                new LauncherProcessImageListener(maxMemoryBytes, allowedMimeTypes));
 +        // setDefaultProcessListener is not available in legacy ImageDecoder
      }
+ 
  }
 diff --git a/quickstep/src/com/android/quickstep/SystemUiProxy.java b/quickstep/src/com/android/quickstep/SystemUiProxy.java
-index 4cdf22aa77..9457277102 100644
+index b5454cbd21..3a604f2a5c 100644
 --- a/quickstep/src/com/android/quickstep/SystemUiProxy.java
 +++ b/quickstep/src/com/android/quickstep/SystemUiProxy.java
-@@ -148,15 +148,8 @@ public class SystemUiProxy implements ISystemUiProxy {
+@@ -210,15 +210,8 @@ public class SystemUiProxy implements ISystemUiProxy, NavHandle {
          }
      }
  
@@ -58,6 +39,3 @@ index 4cdf22aa77..9457277102 100644
      }
  
      @Override
--- 
-2.53.0
-

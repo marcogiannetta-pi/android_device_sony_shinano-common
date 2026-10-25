@@ -1,35 +1,26 @@
-From 0435bc106570d2a39ab7c3ce44ba62ea7c5e0ae1 Mon Sep 17 00:00:00 2001
-From: mgiannetta <marcogiannetta96@gmail.com>
-Date: Sun, 25 Oct 2026 09:49:43 +0100
-Subject: [PATCH] libsensor: Avoid fatal abort if sensorservice is unavailable
-
----
- libs/sensor/SensorManager.cpp | 36 ++++++++++++++++-------------------
- 1 file changed, 16 insertions(+), 20 deletions(-)
-
 diff --git a/libs/sensor/SensorManager.cpp b/libs/sensor/SensorManager.cpp
-index 9f814f1c48..4366d0fff6 100644
+index 9411e204e9..c13db97c7a 100644
 --- a/libs/sensor/SensorManager.cpp
 +++ b/libs/sensor/SensorManager.cpp
-@@ -61,7 +61,7 @@ SensorManager& SensorManager::getInstanceForPackage(const String16& packageName)
-         // all packages in the UID. The caveat is that the operation may be attributed
-         // to the wrong package and stats based on app ops may be slightly off.
-         if (opPackageName.size() <= 0) {
--            sp<IBinder> binder = defaultServiceManager()->getService(String16("permission"));
-+            sp<IBinder> binder = defaultServiceManager()->checkService(String16("permission"));
-             if (binder != nullptr) {
-                 const uid_t uid = IPCThreadState::self()->getCallingUid();
-                 Vector<String16> packages;
-@@ -72,7 +72,7 @@ SensorManager& SensorManager::getInstanceForPackage(const String16& packageName)
-                     ALOGE("No packages for calling UID");
-                 }
-             } else {
--                ALOGE("Cannot get permission service");
-+                ALOGD("Cannot get permission service (vendor context?)");
+@@ -109,7 +109,7 @@ SensorManager& SensorManager::getInstanceForPackage(const String16& packageName)
+     // to the wrong package and stats based on app ops may be slightly off.
+     String16 opPackageName = packageName;
+     if (opPackageName.size() <= 0) {
+-        sp<IBinder> binder = defaultServiceManager()->getService(String16("permission"));
++        sp<IBinder> binder = defaultServiceManager()->checkService(String16("permission"));
+         if (binder != nullptr) {
+             Vector<String16> packages;
+             interface_cast<IPermissionController>(binder)->getPackagesForUid(uid, packages);
+@@ -119,7 +119,7 @@ SensorManager& SensorManager::getInstanceForPackage(const String16& packageName)
+                 ALOGE("No packages for calling UID");
              }
+         } else {
+-            ALOGE("Cannot get permission service");
++            ALOGD("Cannot get permission service (vendor context?)");
          }
+     }
  
-@@ -114,25 +114,18 @@ SensorManager::~SensorManager() {
+@@ -161,25 +161,18 @@ SensorManager::~SensorManager() {
  }
  
  status_t SensorManager::waitForSensorService(sp<ISensorServer> *server) {
@@ -65,9 +56,9 @@ index 9f814f1c48..4366d0fff6 100644
  }
  
  void SensorManager::sensorManagerDied() {
-@@ -159,7 +152,9 @@ status_t SensorManager::assertStateLocked() {
-     }
+@@ -210,7 +203,9 @@ status_t SensorManager::assertStateLocked() {
      if (initSensorManager) {
+ #endif
          waitForSensorService(&mSensorServer);
 -        LOG_ALWAYS_FATAL_IF(mSensorServer == nullptr, "getService(SensorService) NULL");
 +        if (mSensorServer == nullptr) {
@@ -76,7 +67,7 @@ index 9f814f1c48..4366d0fff6 100644
  
          class DeathObserver : public IBinder::DeathRecipient {
              SensorManager& mSensorManager;
-@@ -194,6 +189,7 @@ ssize_t SensorManager::getSensorList(Sensor const* const** list) {
+@@ -250,6 +245,7 @@ ssize_t SensorManager::getSensorList(Sensor const* const** list) {
      Mutex::Autolock _l(mLock);
      status_t err = assertStateLocked();
      if (err < 0) {
@@ -84,6 +75,3 @@ index 9f814f1c48..4366d0fff6 100644
          return static_cast<ssize_t>(err);
      }
      *list = mSensorList;
--- 
-2.53.0
-

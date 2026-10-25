@@ -1,0 +1,14 @@
+diff --git a/java/src/com/android/intentresolver/IntentForwarderActivity.java b/java/src/com/android/intentresolver/IntentForwarderActivity.java
+index 2a957d6..9840d3a 100644
+--- a/java/src/com/android/intentresolver/IntentForwarderActivity.java
++++ b/java/src/com/android/intentresolver/IntentForwarderActivity.java
+@@ -431,8 +431,7 @@ public class IntentForwarderActivity extends Activity  {
+         public CompletableFuture<ResolveInfo> resolveActivityAsUser(Intent intent,
+                 String resolvedType, int flags, int userId) {
+             return CompletableFuture.supplyAsync(
+-                    () -> getPackageManager().resolveActivityAsUser(intent,
+-                            resolvedType, flags, userId));
++                    () -> getPackageManager().resolveActivityAsUser(intent, flags, userId));
+         }
+ 
+         @Override

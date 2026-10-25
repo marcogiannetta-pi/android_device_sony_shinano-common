@@ -1,14 +1,5 @@
-From b7a41c7a6a3eafe67648cbd142054d0312603fbb Mon Sep 17 00:00:00 2001
-From: mgiannetta <marcogiannetta96@gmail.com>
-Date: Sun, 25 Oct 2026 09:50:28 +0100
-Subject: [PATCH] libcutils: Provide weak stubs for sched_policy functions
-
----
- libcutils/iosched_policy.cpp | 14 ++++++++++++++
- 1 file changed, 14 insertions(+)
-
 diff --git a/libcutils/iosched_policy.cpp b/libcutils/iosched_policy.cpp
-index 012c537ac..4c77bf18a 100644
+index f7c724da90..2cb0a63191 100644
 --- a/libcutils/iosched_policy.cpp
 +++ b/libcutils/iosched_policy.cpp
 @@ -15,6 +15,7 @@
@@ -19,7 +10,7 @@ index 012c537ac..4c77bf18a 100644
  
  #include <errno.h>
  #include <fcntl.h>
-@@ -32,6 +33,19 @@
+@@ -31,6 +32,19 @@
  #define __android_unused __attribute__((__unused__))
  #endif
  
@@ -39,6 +30,3 @@ index 012c537ac..4c77bf18a 100644
  int android_set_ioprio(int pid __android_unused, IoSchedClass clazz __android_unused, int ioprio __android_unused) {
  #if defined(__ANDROID__)
      if (syscall(SYS_ioprio_set, IOPRIO_WHO_PROCESS, pid, ioprio | (clazz << IOPRIO_CLASS_SHIFT))) {
--- 
-2.53.0
-

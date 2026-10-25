@@ -1,16 +1,5 @@
-From 07c407b4413672a08c37d9f0973d5060c24d31e7 Mon Sep 17 00:00:00 2001
-From: mgiannetta <marcogiannetta96@gmail.com>
-Date: Sun, 25 Oct 2026 09:49:30 +0100
-Subject: [PATCH] bluetooth: Expand truncated HCI Read Local Name event and
- recover missing H4 prefix
-
----
- bluetooth/1.0/default/h4_protocol.cc   | 43 ++++++++++++++++++++++----
- bluetooth/1.0/default/hci_packetizer.h |  5 +++
- 2 files changed, 42 insertions(+), 6 deletions(-)
-
 diff --git a/bluetooth/1.0/default/h4_protocol.cc b/bluetooth/1.0/default/h4_protocol.cc
-index 24596879d..deb816a5d 100644
+index 24596879d0..deb816a5dc 100644
 --- a/bluetooth/1.0/default/h4_protocol.cc
 +++ b/bluetooth/1.0/default/h4_protocol.cc
 @@ -80,9 +80,29 @@ size_t H4Protocol::Send(uint8_t type, const uint8_t* data, size_t length) {
@@ -79,7 +68,7 @@ index 24596879d..deb816a5d 100644
    } else {
      hci_packetizer_.OnDataReady(fd, hci_packet_type_);
 diff --git a/bluetooth/1.0/default/hci_packetizer.h b/bluetooth/1.0/default/hci_packetizer.h
-index 90579bd2a..17d30b4ee 100644
+index 90579bd2a7..17d30b4eef 100644
 --- a/bluetooth/1.0/default/hci_packetizer.h
 +++ b/bluetooth/1.0/default/hci_packetizer.h
 @@ -35,6 +35,11 @@ class HciPacketizer {
@@ -94,6 +83,3 @@ index 90579bd2a..17d30b4ee 100644
    const hidl_vec<uint8_t>& GetPacket() const;
  
   protected:
--- 
-2.53.0
-

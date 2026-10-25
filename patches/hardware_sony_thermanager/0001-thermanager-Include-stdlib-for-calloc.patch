@@ -1,0 +1,24 @@
+diff --git a/Android.mk b/Android.mk
+index 1b77411..b229302 100644
+--- a/Android.mk
++++ b/Android.mk
+@@ -31,6 +31,7 @@ LOCAL_SRC_FILES := \
+ 
+ LOCAL_SHARED_LIBRARIES := liblog libcutils
+ LOCAL_STATIC_LIBRARIES := libxml2
++LOCAL_CFLAGS := -Wno-error
+ LOCAL_MODULE := thermanager
+ LOCAL_MODULE_TAGS := optional
+ LOCAL_MODULE_OWNER := sony
+diff --git a/src/libxml2parser.c b/src/libxml2parser.c
+index e5885e4..19d08c9 100644
+--- a/src/libxml2parser.c
++++ b/src/libxml2parser.c
+@@ -1,6 +1,7 @@
+ #include <libxml/parser.h>
+ #include <libxml/tree.h>
+ #include <string.h>
++#include <stdlib.h>
+ 
+ #include "dom.h"
+ 

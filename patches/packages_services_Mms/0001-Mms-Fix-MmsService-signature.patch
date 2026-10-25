@@ -1,18 +1,8 @@
-From 601e86a965b86efa418f9cd4d9ac11d8fcb8417c Mon Sep 17 00:00:00 2001
-From: mgiannetta <marcogiannetta96@gmail.com>
-Date: Sun, 25 Oct 2026 09:51:15 +0100
-Subject: [PATCH] Mms: Fix compile issues
-
-Change-Id: Ie43a3fae1f98ad200669411b82f13ecdf7b1353b
----
- src/com/android/mms/service/MmsService.java | 12 ++++++++----
- 1 file changed, 8 insertions(+), 4 deletions(-)
-
 diff --git a/src/com/android/mms/service/MmsService.java b/src/com/android/mms/service/MmsService.java
-index c437213..e56f387 100644
+index 5d9621a..faf5db7 100644
 --- a/src/com/android/mms/service/MmsService.java
 +++ b/src/com/android/mms/service/MmsService.java
-@@ -210,9 +210,10 @@ public class MmsService extends Service implements MmsRequest.RequestManager {
+@@ -214,9 +214,10 @@ public class MmsService extends Service implements MmsRequest.RequestManager {
  
      private IMms.Stub mStub = new IMms.Stub() {
          @Override
@@ -24,7 +14,7 @@ index c437213..e56f387 100644
              LogUtil.d("sendMessage " + formatCrossStackMessageId(messageId));
              enforceSystemUid();
  
-@@ -287,9 +288,10 @@ public class MmsService extends Service implements MmsRequest.RequestManager {
+@@ -298,9 +299,10 @@ public class MmsService extends Service implements MmsRequest.RequestManager {
          }
  
          @Override
@@ -36,7 +26,7 @@ index c437213..e56f387 100644
              // If the subId is no longer active it could be caused by an MVNO using multiple
              // subIds, so we should try to download anyway.
              // TODO: Fail fast when downloading will fail (i.e. SIM swapped)
-@@ -429,8 +431,9 @@ public class MmsService extends Service implements MmsRequest.RequestManager {
+@@ -441,8 +443,9 @@ public class MmsService extends Service implements MmsRequest.RequestManager {
          }
  
          @Override
@@ -47,7 +37,7 @@ index c437213..e56f387 100644
              LogUtil.d("importMultimediaMessage");
              enforceSystemUid();
              return importMms(contentUri, messageId, timestampSecs, seen,
-@@ -524,8 +527,9 @@ public class MmsService extends Service implements MmsRequest.RequestManager {
+@@ -536,8 +539,9 @@ public class MmsService extends Service implements MmsRequest.RequestManager {
          }
  
          @Override
@@ -58,6 +48,3 @@ index c437213..e56f387 100644
              LogUtil.d("addMultimediaMessageDraft");
              enforceSystemUid();
              return addMmsDraft(contentUri, callingUser, callingPkg);
--- 
-2.53.0
-

@@ -1,0 +1,211 @@
+diff --git a/brcm-uim-sysfs/Android.mk b/brcm-uim-sysfs/Android.mk
+index 3158910..d67cf39 100755
+--- a/brcm-uim-sysfs/Android.mk
++++ b/brcm-uim-sysfs/Android.mk
+@@ -14,7 +14,7 @@ LOCAL_SRC_FILES:= \
+     btsnoop.c \
+     utils.c
+ 
+-LOCAL_CFLAGS:= -c -W -Wall -O2 -D_POSIX_SOURCE -DUIM_DEBUG -DBLUEDROID_ENABLE_V4L2
++LOCAL_CFLAGS:= -c -W -Wall -O2 -D_POSIX_SOURCE -DUIM_DEBUG -DBLUEDROID_ENABLE_V4L2 -Wno-deprecated-non-prototype -Wno-error
+ LOCAL_SHARED_LIBRARIES:= libnetutils libcutils liblog
+ 
+ SYSFS_PREFIX := "/sys/bus/platform/drivers/bcm_ldisc/bcmbt_ldisc.93/"
+diff --git a/brcm-uim-sysfs/include/uim.h b/brcm-uim-sysfs/include/uim.h
+index fcec88a..82b95f7 100755
+--- a/brcm-uim-sysfs/include/uim.h
++++ b/brcm-uim-sysfs/include/uim.h
+@@ -179,10 +179,10 @@ extern int delete_module(const char *, unsigned int);
+ /* Function declarations */
+ void proc_init_uart(int uart_fd, struct termios *termios);
+ int st_uart_config(unsigned char install);
+-int proc_hci_reset();
++int proc_hci_reset(void);
+ extern int upio_set_bluetooth_power(int on);
+-int proc_hci_uartclockset();
+-void read_default_bdaddr();
+-int proc_bdaddr();
++int proc_hci_uartclockset(void);
++void read_default_bdaddr(bdaddr_t *local_addr);
++int proc_bdaddr(void);
+ 
+ #endif /* UIM_H */
+diff --git a/brcm-uim-sysfs/uim.c b/brcm-uim-sysfs/uim.c
+index 3c30411..5378e35 100755
+--- a/brcm-uim-sysfs/uim.c
++++ b/brcm-uim-sysfs/uim.c
+@@ -1244,7 +1244,7 @@ int st_uart_config(unsigned char install)
+ /*****************************************************************************
+ * Function to process BD ADDRESS
+ *****************************************************************************/
+-int proc_bdaddr()
++int proc_bdaddr(void)
+ {
+     bdstr_t bdstr;
+     int fd =-1,res=0;
+@@ -1270,7 +1270,7 @@ int proc_bdaddr()
+ /*****************************************************************************
+ * Function to perform HCI Reset
+  *****************************************************************************/
+-int proc_hci_reset()
++int proc_hci_reset(void)
+ {
+     const char hci_reset_cmd[] = {0x01, 0x03, 0x0C, 0x00};
+     int len;
+@@ -1416,7 +1416,7 @@ int main(void)
+     /* Read configuration parameters for hci snoop */
+     if (vnd_load_conf(STACK_CONF_FILE, &stack_conf_table[0]))
+     {
+-        return UIM_FAIL;
++        vnd_load_conf("/apex/com.android.btservices/etc/bluetooth/bt_stack.conf", &stack_conf_table[0]);
+     }
+ #endif
+ 
+diff --git a/brcm-uim-sysfs/upio.c b/brcm-uim-sysfs/upio.c
+index c2a9e79..a38942e 100755
+--- a/brcm-uim-sysfs/upio.c
++++ b/brcm-uim-sysfs/upio.c
+@@ -30,7 +30,7 @@
+ 
+ #define LOG_TAG "bt_upio"
+ 
+-#include <utils/Log.h>
++#include <log/log.h>
+ #include <fcntl.h>
+ #include <errno.h>
+ #include <malloc.h>
+diff --git a/fmradio.v4l2-fm/v4l2_fm.c b/fmradio.v4l2-fm/v4l2_fm.c
+index 1d62b1c..6faaa59 100644
+--- a/fmradio.v4l2-fm/v4l2_fm.c
++++ b/fmradio.v4l2-fm/v4l2_fm.c
+@@ -24,7 +24,7 @@
+ #define ALOGI printf
+ #define ALOGE printf
+ #else
+-#include "utils/Log.h"
++#include <log/log.h>
+ #endif
+ 
+ #include <stdio.h>
+diff --git a/fmradio.v4l2-fm/v4l2_ioctl.c b/fmradio.v4l2-fm/v4l2_ioctl.c
+index f705b1b..96a3d60 100644
+--- a/fmradio.v4l2-fm/v4l2_ioctl.c
++++ b/fmradio.v4l2-fm/v4l2_ioctl.c
+@@ -23,7 +23,7 @@
+ #define ALOGI printf
+ #define ALOGE printf
+ #else
+-#include "utils/Log.h"
++#include <log/log.h>
+ #endif
+ 
+ #include "v4l2_ioctl.h"
+diff --git a/libfmjni/Android.bp b/libfmjni/Android.bp
+new file mode 100644
+index 0000000..08d678d
+--- /dev/null
++++ b/libfmjni/Android.bp
+@@ -0,0 +1,37 @@
++// Copyright (C) 2014 The Android Open Source Project
++//
++// Licensed under the Apache License, Version 2.0 (the "License");
++// you may not use this file except in compliance with the License.
++// You may obtain a copy of the License at
++//
++//      http://www.apache.org/licenses/LICENSE-2.0
++//
++// Unless required by applicable law or agreed to in writing, software
++// distributed under the License is distributed on an "AS IS" BASIS,
++// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++// See the License for the specific language governing permissions and
++// limitations under the License.
++
++cc_library_shared {
++    name: "libfmjni",
++
++    srcs: [
++        "android_fm.cpp",
++        "android_fmradio_Receiver.cpp",
++    ],
++
++    cflags: [
++        "-Wno-unused-function",
++        "-DLIBRARY_PATH=\"/vendor/lib/\"",
++    ],
++
++    shared_libs: [
++        "liblog",
++        "libnativehelper",
++    ],
++
++    required: [
++        "libfmradio.v4l2-fm",
++        "brcm-uim-sysfs",
++    ],
++}
+diff --git a/libfmjni/Android.mk b/libfmjni/Android.mk
+deleted file mode 100644
+index a846f93..0000000
+--- a/libfmjni/Android.mk
++++ /dev/null
+@@ -1,34 +0,0 @@
+-# Copyright (C) 2014 The Android Open Source Project
+-#
+-# Licensed under the Apache License, Version 2.0 (the "License");
+-# you may not use this file except in compliance with the License.
+-# You may obtain a copy of the License at
+-#
+-#      http://www.apache.org/licenses/LICENSE-2.0
+-#
+-# Unless required by applicable law or agreed to in writing, software
+-# distributed under the License is distributed on an "AS IS" BASIS,
+-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+-# See the License for the specific language governing permissions and
+-# limitations under the License.
+-
+-LOCAL_PATH := $(call my-dir)
+-
+-include $(CLEAR_VARS)
+-
+-LOCAL_MODULE    := libfmjni
+-LOCAL_SRC_FILES := android_fm.cpp \
+-                   android_fmradio_Receiver.cpp
+-
+-LOCAL_CFLAGS := \
+-    -Wno-unused-function \
+-
+-ifneq ($(strip $(TARGET_ARCH)),arm64)
+-LIBRARY_PATH:="/vendor/lib/"
+-LOCAL_CFLAGS+= -DLIBRARY_PATH=\"$(LIBRARY_PATH)\"
+-endif
+-
+-LOCAL_REQUIRED_MODULES := libfmradio.v4l2-fm brcm-uim-sysfs
+-LOCAL_SHARED_LIBRARIES += liblog libnativehelper
+-
+-include $(BUILD_SHARED_LIBRARY)
+diff --git a/libfmjni/android_fm.cpp b/libfmjni/android_fm.cpp
+index 0e3406d..a62c610 100755
+--- a/libfmjni/android_fm.cpp
++++ b/libfmjni/android_fm.cpp
+@@ -36,7 +36,7 @@
+ 
+ #include "jni.h"
+ 
+-#include <utils/Log.h>
++#include <log/log.h>
+ #include "android_fmradio_Receiver.h"
+ 
+ #ifndef LIBRARY_PATH
+diff --git a/libfmjni/android_fmradio_Receiver.cpp b/libfmjni/android_fmradio_Receiver.cpp
+index ddffaec..0ee6faa 100755
+--- a/libfmjni/android_fmradio_Receiver.cpp
++++ b/libfmjni/android_fmradio_Receiver.cpp
+@@ -43,7 +43,7 @@
+ #include "jni.h"
+ #include <nativehelper/JNIHelp.h>
+ #include "android_fmradio_Receiver.h"
+-#include <utils/Log.h>
++#include <log/log.h>
+ 
+ 
+ /* *INDENT-OFF* */
