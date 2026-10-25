@@ -1,0 +1,33 @@
+From 878ef7bda91f67b9b2cef4516d531c22317e9e2d Mon Sep 17 00:00:00 2001
+From: mgiannetta <marcogiannetta96@gmail.com>
+Date: Sun, 25 Oct 2026 10:02:04 +0100
+Subject: [PATCH] Trebuchet: Fix compile issues
+
+Change-Id: I73cffe7d291050fd99a7e182b182b1dae6244e01
+---
+ .../quickstep/QuickstepProcessInitializer.java        | 11 -----------
+ 1 file changed, 11 deletions(-)
+
+diff --git a/quickstep/src/com/android/quickstep/QuickstepProcessInitializer.java b/quickstep/src/com/android/quickstep/QuickstepProcessInitializer.java
+index 43c5c55..01f5f73 100644
+--- a/quickstep/src/com/android/quickstep/QuickstepProcessInitializer.java
++++ b/quickstep/src/com/android/quickstep/QuickstepProcessInitializer.java
+@@ -65,15 +65,4 @@ public class QuickstepProcessInitializer extends MainProcessInitializer {
+         ThreadedRendererCompat.setContextPriority(
+                 ThreadedRendererCompat.EGL_CONTEXT_PRIORITY_HIGH_IMG);
+     }
+-
+-    private void setupImageDecoder(Context context) {
+-        // Limit the max memory usage.
+-        int maxMemoryMb = context.getResources().getInteger(R.integer.max_launcher_memory_mb);
+-        long maxMemoryBytes = maxMemoryMb * 1024L * 1024L;
+-        // Get the allowed mime types from the resources.
+-        Set<String> allowedMimeTypes = Set.of(context.getResources().getStringArray(
+-                R.array.allowed_image_mime_types));
+-        ImageDecoder.setDefaultProcessListener(
+-                new LauncherProcessImageListener(maxMemoryBytes, allowedMimeTypes));
+-    }
+ }
+-- 
+2.53.0
+

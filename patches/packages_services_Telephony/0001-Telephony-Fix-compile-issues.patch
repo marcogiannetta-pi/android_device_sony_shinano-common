@@ -1,0 +1,41 @@
+From 5310528182e8190e3c24fe2f82a66bde6d649f71 Mon Sep 17 00:00:00 2001
+From: mgiannetta <marcogiannetta96@gmail.com>
+Date: Sun, 25 Oct 2026 10:02:04 +0100
+Subject: [PATCH] Telephony: Fix compile issues
+
+Change-Id: I09f4944dafe5f644ecd4c8299fb347d892c26601
+---
+ src/com/android/phone/CarrierConfigLoader.java   | 2 +-
+ src/com/android/phone/PhoneInterfaceManager.java | 3 ++-
+ 2 files changed, 3 insertions(+), 2 deletions(-)
+
+diff --git a/src/com/android/phone/CarrierConfigLoader.java b/src/com/android/phone/CarrierConfigLoader.java
+index f71079e..8ab7c0d 100644
+--- a/src/com/android/phone/CarrierConfigLoader.java
++++ b/src/com/android/phone/CarrierConfigLoader.java
+@@ -1277,7 +1277,7 @@ public class CarrierConfigLoader extends ICarrierConfigLoader.Stub {
+ 
+         // Do not allow shell UID to override the carrier config. This will not impact
+         // the CTS and telephony shell commands as they use different uids
+-        if (TelephonyPermissions.isShell(getCallingUid())) {
++        if (getCallingUid() == Process.SHELL_UID || getCallingUid() == Process.ROOT_UID) {
+             throw new SecurityException("overrideConfig cannot be invoked by shell");
+         }
+ 
+diff --git a/src/com/android/phone/PhoneInterfaceManager.java b/src/com/android/phone/PhoneInterfaceManager.java
+index fa24ab8..a5c3000 100755
+--- a/src/com/android/phone/PhoneInterfaceManager.java
++++ b/src/com/android/phone/PhoneInterfaceManager.java
+@@ -8271,7 +8271,8 @@ public class PhoneInterfaceManager extends ITelephony.Stub {
+     public int setAllowedCarriers(CarrierRestrictionRules carrierRestrictionRules) {
+         // Shell has MODIFY_PHONE_STATE permission even without root
+         // But we don't want adb shell to disable carrier restrictions
+-        if (TelephonyPermissions.isShell(Binder.getCallingUid())) {
++        if (Binder.getCallingUid() == Process.SHELL_UID
++                || Binder.getCallingUid() == Process.ROOT_UID) {
+             throw new SecurityException("setAllowedCarriers cannot be invoked by shell");
+         }
+         enforceModifyPermission();
+-- 
+2.53.0
+

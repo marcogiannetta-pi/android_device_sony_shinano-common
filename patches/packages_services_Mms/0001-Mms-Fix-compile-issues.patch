@@ -1,0 +1,63 @@
+From 66adb87b0258eb64cdc106249e567cd73aeffaf1 Mon Sep 17 00:00:00 2001
+From: mgiannetta <marcogiannetta96@gmail.com>
+Date: Sun, 25 Oct 2026 10:02:04 +0100
+Subject: [PATCH] Mms: Fix compile issues
+
+Change-Id: I952b2ee5e8abbe20947616f1f240ff9c83f902fd
+---
+ src/com/android/mms/service/MmsService.java | 12 ++++++++----
+ 1 file changed, 8 insertions(+), 4 deletions(-)
+
+diff --git a/src/com/android/mms/service/MmsService.java b/src/com/android/mms/service/MmsService.java
+index c4005f1..a7e10bf 100644
+--- a/src/com/android/mms/service/MmsService.java
++++ b/src/com/android/mms/service/MmsService.java
+@@ -188,9 +188,10 @@ public class MmsService extends Service implements MmsRequest.RequestManager {
+ 
+     private IMms.Stub mStub = new IMms.Stub() {
+         @Override
+-        public void sendMessage(int subId, int callingUser, String callingPkg,
++        public void sendMessage(int subId, String callingPkg,
+                 Uri contentUri, String locationUrl, Bundle configOverrides,
+                 PendingIntent sentIntent, long messageId) {
++            final int callingUser = UserHandle.getCallingUserId();
+             LogUtil.d("sendMessage " + formatCrossStackMessageId(messageId));
+             enforceSystemUid();
+ 
+@@ -241,9 +242,10 @@ public class MmsService extends Service implements MmsRequest.RequestManager {
+         }
+ 
+         @Override
+-        public void downloadMessage(int subId, int callingUser, String callingPkg,
++        public void downloadMessage(int subId, String callingPkg,
+                 String locationUrl, Uri contentUri, Bundle configOverrides,
+                 PendingIntent downloadedIntent, long messageId) {
++            final int callingUser = UserHandle.getCallingUserId();
+             // If the subId is no longer active it could be caused by an MVNO using multiple
+             // subIds, so we should try to download anyway.
+             // TODO: Fail fast when downloading will fail (i.e. SIM swapped)
+@@ -355,8 +357,9 @@ public class MmsService extends Service implements MmsRequest.RequestManager {
+         }
+ 
+         @Override
+-        public Uri importMultimediaMessage(int callingUser, String callingPkg,
++        public Uri importMultimediaMessage(String callingPkg,
+                 Uri contentUri, String messageId, long timestampSecs, boolean seen, boolean read) {
++            final int callingUser = UserHandle.getCallingUserId();
+             LogUtil.d("importMultimediaMessage");
+             enforceSystemUid();
+             return importMms(contentUri, messageId, timestampSecs, seen,
+@@ -450,8 +453,9 @@ public class MmsService extends Service implements MmsRequest.RequestManager {
+         }
+ 
+         @Override
+-        public Uri addMultimediaMessageDraft(int callingUser,
++        public Uri addMultimediaMessageDraft(
+                 String callingPkg, Uri contentUri) throws RemoteException {
++            final int callingUser = UserHandle.getCallingUserId();
+             LogUtil.d("addMultimediaMessageDraft");
+             enforceSystemUid();
+             return addMmsDraft(contentUri, callingUser, callingPkg);
+-- 
+2.53.0
+
