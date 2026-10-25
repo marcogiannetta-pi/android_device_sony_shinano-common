@@ -1,0 +1,25 @@
+From 86e30a49e2f5ae4b6dc28c3b8585e2b09b84772a Mon Sep 17 00:00:00 2001
+From: mgiannetta <marcogiannetta96@gmail.com>
+Date: Sun, 25 Oct 2026 09:50:08 +0100
+Subject: [PATCH] audio_hw: Avoid set_sched_policy in offload thread loop
+
+---
+ hal/audio_hw.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/hal/audio_hw.c b/hal/audio_hw.c
+index 9c7e11b..8c1fb05 100644
+--- a/hal/audio_hw.c
++++ b/hal/audio_hw.c
+@@ -1270,7 +1270,7 @@ static void *offload_thread_loop(void *context)
+     int ret = 0;
+ 
+     setpriority(PRIO_PROCESS, 0, ANDROID_PRIORITY_AUDIO);
+-    set_sched_policy(0, SP_FOREGROUND);
++    // set_sched_policy(0, SP_FOREGROUND);
+     prctl(PR_SET_NAME, (unsigned long)"Offload Callback", 0, 0, 0);
+ 
+     ALOGV("%s", __func__);
+-- 
+2.53.0
+

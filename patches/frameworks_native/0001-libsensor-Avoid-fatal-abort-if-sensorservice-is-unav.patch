@@ -1,0 +1,89 @@
+From 0435bc106570d2a39ab7c3ce44ba62ea7c5e0ae1 Mon Sep 17 00:00:00 2001
+From: mgiannetta <marcogiannetta96@gmail.com>
+Date: Sun, 25 Oct 2026 09:49:43 +0100
+Subject: [PATCH] libsensor: Avoid fatal abort if sensorservice is unavailable
+
+---
+ libs/sensor/SensorManager.cpp | 36 ++++++++++++++++-------------------
+ 1 file changed, 16 insertions(+), 20 deletions(-)
+
+diff --git a/libs/sensor/SensorManager.cpp b/libs/sensor/SensorManager.cpp
+index 9f814f1c48..4366d0fff6 100644
+--- a/libs/sensor/SensorManager.cpp
++++ b/libs/sensor/SensorManager.cpp
+@@ -61,7 +61,7 @@ SensorManager& SensorManager::getInstanceForPackage(const String16& packageName)
+         // all packages in the UID. The caveat is that the operation may be attributed
+         // to the wrong package and stats based on app ops may be slightly off.
+         if (opPackageName.size() <= 0) {
+-            sp<IBinder> binder = defaultServiceManager()->getService(String16("permission"));
++            sp<IBinder> binder = defaultServiceManager()->checkService(String16("permission"));
+             if (binder != nullptr) {
+                 const uid_t uid = IPCThreadState::self()->getCallingUid();
+                 Vector<String16> packages;
+@@ -72,7 +72,7 @@ SensorManager& SensorManager::getInstanceForPackage(const String16& packageName)
+                     ALOGE("No packages for calling UID");
+                 }
+             } else {
+-                ALOGE("Cannot get permission service");
++                ALOGD("Cannot get permission service (vendor context?)");
+             }
+         }
+ 
+@@ -114,25 +114,18 @@ SensorManager::~SensorManager() {
+ }
+ 
+ status_t SensorManager::waitForSensorService(sp<ISensorServer> *server) {
+-    // try for 300 seconds (60*5(getService() tries for 5 seconds)) before giving up ...
+-    sp<ISensorServer> s;
+-    const String16 name("sensorservice");
+-    for (int i = 0; i < 60; i++) {
+-        status_t err = getService(name, &s);
+-        switch (err) {
+-            case NAME_NOT_FOUND:
+-                sleep(1);
+-                continue;
+-            case NO_ERROR:
+-                if (server != nullptr) {
+-                    *server = s;
+-                }
+-                return NO_ERROR;
+-            default:
+-                return err;
++    sp<IBinder> binder = defaultServiceManager()->checkService(String16("sensorservice"));
++    if (binder == nullptr) {
++        return NAME_NOT_FOUND;
++    }
++    sp<ISensorServer> s = interface_cast<ISensorServer>(binder);
++    if (s != nullptr) {
++        if (server != nullptr) {
++            *server = s;
+         }
++        return NO_ERROR;
+     }
+-    return TIMED_OUT;
++    return NAME_NOT_FOUND;
+ }
+ 
+ void SensorManager::sensorManagerDied() {
+@@ -159,7 +152,9 @@ status_t SensorManager::assertStateLocked() {
+     }
+     if (initSensorManager) {
+         waitForSensorService(&mSensorServer);
+-        LOG_ALWAYS_FATAL_IF(mSensorServer == nullptr, "getService(SensorService) NULL");
++        if (mSensorServer == nullptr) {
++            return NO_INIT;
++        }
+ 
+         class DeathObserver : public IBinder::DeathRecipient {
+             SensorManager& mSensorManager;
+@@ -194,6 +189,7 @@ ssize_t SensorManager::getSensorList(Sensor const* const** list) {
+     Mutex::Autolock _l(mLock);
+     status_t err = assertStateLocked();
+     if (err < 0) {
++        if (list) *list = nullptr;
+         return static_cast<ssize_t>(err);
+     }
+     *list = mSensorList;
+-- 
+2.53.0
+

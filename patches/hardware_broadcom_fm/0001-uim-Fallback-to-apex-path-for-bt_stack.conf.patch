@@ -1,0 +1,26 @@
+From 512ba5179c75eb317131b2966856815b9faeb4f6 Mon Sep 17 00:00:00 2001
+From: mgiannetta <marcogiannetta96@gmail.com>
+Date: Sun, 25 Oct 2026 09:50:20 +0100
+Subject: [PATCH] uim: Fallback to apex path for bt_stack.conf
+
+Change-Id: If26932c677ce08f345a4b95979c123d893f28ec6
+---
+ brcm-uim-sysfs/uim.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/brcm-uim-sysfs/uim.c b/brcm-uim-sysfs/uim.c
+index 3c30411..c0e87a5 100755
+--- a/brcm-uim-sysfs/uim.c
++++ b/brcm-uim-sysfs/uim.c
+@@ -1416,7 +1416,7 @@ int main(void)
+     /* Read configuration parameters for hci snoop */
+     if (vnd_load_conf(STACK_CONF_FILE, &stack_conf_table[0]))
+     {
+-        return UIM_FAIL;
++        vnd_load_conf("/apex/com.android.btservices/etc/bluetooth/bt_stack.conf", &stack_conf_table[0]);
+     }
+ #endif
+ 
+-- 
+2.53.0
+

@@ -1,0 +1,63 @@
+From b49cff02542c4ba3c304dd00164333c8ab1de02a Mon Sep 17 00:00:00 2001
+From: mgiannetta <marcogiannetta96@gmail.com>
+Date: Sun, 25 Oct 2026 09:51:15 +0100
+Subject: [PATCH] Trebuchet: Fix compile issues
+
+Change-Id: If552c18e21231273fc8d9deec68ab704c55e6570
+---
+ .../quickstep/QuickstepProcessInitializer.java        | 11 ++---------
+ .../src/com/android/quickstep/SystemUiProxy.java      |  9 +--------
+ 2 files changed, 3 insertions(+), 17 deletions(-)
+
+diff --git a/quickstep/src/com/android/quickstep/QuickstepProcessInitializer.java b/quickstep/src/com/android/quickstep/QuickstepProcessInitializer.java
+index 50066bb4d3..2391703386 100644
+--- a/quickstep/src/com/android/quickstep/QuickstepProcessInitializer.java
++++ b/quickstep/src/com/android/quickstep/QuickstepProcessInitializer.java
+@@ -67,7 +67,7 @@ public class QuickstepProcessInitializer extends MainProcessInitializer {
+         ThreadedRenderer.setContextPriority(
+                 ThreadedRenderer.EGL_CONTEXT_PRIORITY_HIGH_IMG);
+ 
+-        setupImageDecoder(context);
++        // setupImageDecoder(context);
+ 
+         // Enable binder tracing on system server for calls originating from Launcher
+         try {
+@@ -78,13 +78,6 @@ public class QuickstepProcessInitializer extends MainProcessInitializer {
+     }
+ 
+     private void setupImageDecoder(Context context) {
+-        // Limit the max memory usage.
+-        int maxMemoryMb = context.getResources().getInteger(R.integer.max_launcher_memory_mb);
+-        long maxMemoryBytes = maxMemoryMb * 1024L * 1024L;
+-        // Get the allowed mime types from the resources.
+-        Set<String> allowedMimeTypes = Set.of(context.getResources().getStringArray(
+-                R.array.allowed_image_mime_types));
+-        ImageDecoder.setDefaultProcessListener(
+-                new LauncherProcessImageListener(maxMemoryBytes, allowedMimeTypes));
++        // setDefaultProcessListener is not available in legacy ImageDecoder
+     }
+ }
+diff --git a/quickstep/src/com/android/quickstep/SystemUiProxy.java b/quickstep/src/com/android/quickstep/SystemUiProxy.java
+index 4cdf22aa77..9457277102 100644
+--- a/quickstep/src/com/android/quickstep/SystemUiProxy.java
++++ b/quickstep/src/com/android/quickstep/SystemUiProxy.java
+@@ -148,15 +148,8 @@ public class SystemUiProxy implements ISystemUiProxy {
+         }
+     }
+ 
+-    @Override
+     public void onKeyEvent(int keycode) {
+-        if (mSystemUiProxy != null) {
+-            try {
+-                mSystemUiProxy.onKeyEvent(keycode);
+-            } catch (RemoteException e) {
+-                Log.w(TAG, "Failed call onKeyEvent", e);
+-            }
+-        }
++        // Not implemented in legacy ISystemUiProxy
+     }
+ 
+     @Override
+-- 
+2.53.0
+

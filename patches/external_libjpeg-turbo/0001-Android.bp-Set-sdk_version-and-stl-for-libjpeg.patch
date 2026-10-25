@@ -1,0 +1,26 @@
+From e61bb57163c408138deccd60f4e7eb9addd02913 Mon Sep 17 00:00:00 2001
+From: mgiannetta <marcogiannetta96@gmail.com>
+Date: Sun, 25 Oct 2026 09:51:00 +0100
+Subject: [PATCH] Android.bp: Set sdk_version and stl for libjpeg
+
+Change-Id: I5bc94324198516e5089255acfd77f64f77bb849e
+---
+ Android.bp | 2 ++
+ 1 file changed, 2 insertions(+)
+
+diff --git a/Android.bp b/Android.bp
+index 02e2d11..04191b7 100644
+--- a/Android.bp
++++ b/Android.bp
+@@ -275,6 +275,8 @@ cc_defaults {
+ // Build as a shared library.
+ cc_library {
+     name: "libjpeg",
++    sdk_version: "current",
++    stl: "none",
+     host_supported: true,
+     vendor_available: true,
+     product_available: true,
+-- 
+2.53.0
+
