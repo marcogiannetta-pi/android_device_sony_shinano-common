@@ -22,6 +22,7 @@ import /vendor/etc/init/hw/init.platform-common.rc
 import /vendor/etc/init/hw/init.camera.rc
 
 on early-init
+    setprop bpf.progs_loaded 1
     mount debugfs /sys/kernel/debug /sys/kernel/debug mode=755
     mount cgroup none /sys/fs/cgroup nodev noexec nosuid cpuacct
     chown system system /sys/fs/cgroup
@@ -275,6 +276,8 @@ on post-fs
     chown system system /sys/class/leds/led:rgb_blue/pause_hi_multi
 
 on post-fs-data
+    # Enable ZRAM early during boot to prevent OOM panic with Android 14
+    swapon_all /vendor/etc/fstab.qcom
     # Observe dnsmasq.leases file for dhcp information of soft ap.
     chown dhcp dhcp /data/misc/dhcp
 
@@ -364,8 +367,7 @@ on post-fs-data
     mkdir /data/persist/marlin 0700 system system
 
 on property:sys.boot_completed=1
-    # Enable ZRAM on boot_complete
-    swapon_all /vendor/etc/fstab.qcom
+    # ZRAM is now enabled in post-fs-data
 
 on property:bluetooth.isEnabled=true
 #    start btwlancoex
@@ -491,3 +493,6 @@ service urandom_init /vendor/bin/urandom_init
     seclabel u:r:su:s0
     oneshot
     disabled
+
+on load_bpf_programs
+    setprop bpf.progs_loaded 1

@@ -44,6 +44,16 @@ extern "C" status_t _ZNK7android13GraphicBuffer9initCheckEv(const GraphicBuffer*
     return android::OK;
 }
 
+// GraphicBufferMapper::unlock(buffer_handle_t) ABI shim for Android 14+
+extern "C" status_t _ZN7android19GraphicBufferMapper6unlockEPK13native_handlePNS_4base14unique_fd_implINS4_13DefaultCloserEEE(
+        void* thisptr, buffer_handle_t handle, void* outFence);
+
+extern "C" status_t _ZN7android19GraphicBufferMapper6unlockEPK13native_handle(
+        void* thisptr, buffer_handle_t handle) {
+    return _ZN7android19GraphicBufferMapper6unlockEPK13native_handlePNS_4base14unique_fd_implINS4_13DefaultCloserEEE(
+            thisptr, handle, nullptr);
+}
+
 // Permission shims for vendor camera HAL
 extern "C" bool _ZN7android22checkCallingPermissionERKNS_8String16EPiS3_(
         const void* /*permission*/, int* outPid, int* outUid) {

@@ -1,5 +1,7 @@
 #!/vendor/bin/sh
 
+setprop bpf.progs_loaded 1
+
 # Start suntrold
 /vendor/bin/suntrold
 

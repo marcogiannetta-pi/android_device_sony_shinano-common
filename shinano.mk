@@ -130,6 +130,10 @@ PRODUCT_COPY_FILES += \
 include $(COMMON_PATH)/system_prop.mk
 
 # Ramdisk
+PRODUCT_COPY_FILES += \
+    $(COMMON_PATH)/rootdir/etc/fstab.qcom:$(TARGET_COPY_OUT_RAMDISK)/fstab.qcom \
+    $(COMMON_PATH)/rootdir/etc/fstab.qcom:$(TARGET_COPY_OUT_RAMDISK)/system/etc/fstab.qcom
+
 PRODUCT_PACKAGES += \
     fstab.qcom \
     init.camera.rc \
