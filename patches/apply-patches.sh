@@ -25,6 +25,7 @@ declare -A PATCH_MAP=(
     ["packages_services_Mms"]="packages/services/Mms"
     ["system_core"]="system/core"
     ["system_media"]="system/media"
+    ["system_vold"]="system/vold"
 )
 
 for patch_dir in "${!PATCH_MAP[@]}"; do

@@ -1,0 +1,43 @@
+From 455c8a6e3e42460682b5f0dd115238801f219a32 Mon Sep 17 00:00:00 2001
+From: mgiannetta <marcogiannetta96@gmail.com>
+Date: Tue, 27 Oct 2026 17:27:42 +0100
+Subject: [PATCH] vold: Add fallback for kernels without VFAT time_offset
+ support
+
+Change-Id: Ibaeecd3bf7b732c5c1aadaca224927eb414d8b83
+---
+ fs/Vfat.cpp | 14 ++++++++++++++
+ 1 file changed, 14 insertions(+)
+
+diff --git a/fs/Vfat.cpp b/fs/Vfat.cpp
+index c0cd918d..40f8ea6e 100644
+--- a/fs/Vfat.cpp
++++ b/fs/Vfat.cpp
+@@ -176,10 +176,24 @@ status_t Mount(const std::string& source, const std::string& target, bool ro, bo
+ 
+     rc = mount(c_source, c_target, "vfat", flags, mountData.c_str());
+ 
++    if (rc && errno == EINVAL) {
++        // Fallback for kernels without time_offset support
++        auto fallbackData =
++            android::base::StringPrintf("utf8,uid=%d,gid=%d,fmask=%o,dmask=%o,shortname=mixed",
++                                        ownerUid, ownerGid, permMask, permMask);
++        rc = mount(c_source, c_target, "vfat", flags, fallbackData.c_str());
++    }
++
+     if (rc && errno == EROFS) {
+         LOG(ERROR) << source << " appears to be a read only filesystem - retrying mount RO";
+         flags |= MS_RDONLY;
+         rc = mount(c_source, c_target, "vfat", flags, mountData.c_str());
++        if (rc && errno == EINVAL) {
++            auto fallbackData =
++                android::base::StringPrintf("utf8,uid=%d,gid=%d,fmask=%o,dmask=%o,shortname=mixed",
++                                            ownerUid, ownerGid, permMask, permMask);
++            rc = mount(c_source, c_target, "vfat", flags, fallbackData.c_str());
++        }
+     }
+ 
+     if (rc == 0 && createLost) {
+-- 
+2.53.0
+
