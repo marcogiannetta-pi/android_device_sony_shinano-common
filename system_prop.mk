@@ -39,12 +39,13 @@ PRODUCT_PROPERTY_OVERRIDES += \
 
 # Audio HAL
 PRODUCT_PROPERTY_OVERRIDES += \
+    persist.audio.dualmic.config=endfire \
     persist.audio.fluence.audiorec=true \
     persist.audio.fluence.speaker=true \
     persist.audio.fluence.voicecall=true \
-    persist.audio.fluence.voicerec=false \
+    persist.audio.fluence.voicerec=true \
     ro.qc.sdk.audio.ssr=false \
-    ro.qc.sdk.audio.fluencetype=none
+    ro.qc.sdk.audio.fluencetype=fluence
 
 # Bluetooth
 PRODUCT_PROPERTY_OVERRIDES += \
