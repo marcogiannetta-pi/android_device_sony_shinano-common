@@ -1,0 +1,51 @@
+From cf4132e9b60dd0aaf09e9ab856162ab23b9fe9f1 Mon Sep 17 00:00:00 2001
+From: mgiannetta <marcogiannetta96@gmail.com>
+Date: Tue, 27 Oct 2026 16:35:06 +0100
+Subject: [PATCH] libaudiohal: Properly initialize mPrimaryDevice for HIDL <=
+ 3.0
+
+---
+ media/libaudiohal/impl/DeviceHalHidl.cpp         | 7 ++++++-
+ media/libaudiohal/impl/DevicesFactoryHalHidl.cpp | 8 +++++++-
+ 2 files changed, 13 insertions(+), 2 deletions(-)
+
+diff --git a/media/libaudiohal/impl/DeviceHalHidl.cpp b/media/libaudiohal/impl/DeviceHalHidl.cpp
+index eaafba3f8b..9c63123ca6 100644
+--- a/media/libaudiohal/impl/DeviceHalHidl.cpp
++++ b/media/libaudiohal/impl/DeviceHalHidl.cpp
+@@ -50,7 +50,12 @@ using namespace ::android::hardware::audio::CORE_TYPES_CPP_VERSION;
+         mediautils::makeTimeCheckStatsForClassMethod(getClassName(), __func__)
+ 
+ DeviceHalHidl::DeviceHalHidl(const sp<::android::hardware::audio::CPP_VERSION::IDevice>& device)
+-        : CoreConversionHelperHidl("DeviceHalHidl"), mDevice(device) {
++        : CoreConversionHelperHidl("DeviceHalHidl"),
++          mDevice(device)
++#if MAJOR_VERSION <= 3
++        , mPrimaryDevice(::android::hardware::audio::CPP_VERSION::IPrimaryDevice::castFrom(device))
++#endif
++{
+ }
+ 
+ DeviceHalHidl::DeviceHalHidl(
+diff --git a/media/libaudiohal/impl/DevicesFactoryHalHidl.cpp b/media/libaudiohal/impl/DevicesFactoryHalHidl.cpp
+index b86de107e2..2c2f36dbe5 100644
+--- a/media/libaudiohal/impl/DevicesFactoryHalHidl.cpp
++++ b/media/libaudiohal/impl/DevicesFactoryHalHidl.cpp
+@@ -126,7 +126,13 @@ status_t DevicesFactoryHalHidl::openDevice(const char *name, sp<DeviceHalInterfa
+                         const sp<::android::hardware::audio::CPP_VERSION::IDevice>& result) {
+                         retval = r;
+                         if (retval == Result::OK) {
+-                            *device = new DeviceHalHidl(result);
++                            sp<::android::hardware::audio::CPP_VERSION::IPrimaryDevice> primary =
++                                    ::android::hardware::audio::CPP_VERSION::IPrimaryDevice::castFrom(result);
++                            if (primary != nullptr) {
++                                *device = new DeviceHalHidl(primary);
++                            } else {
++                                *device = new DeviceHalHidl(result);
++                            }
+                         }
+                     });
+ #else
+-- 
+2.53.0
+
