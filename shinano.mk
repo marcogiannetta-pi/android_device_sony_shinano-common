@@ -51,6 +51,7 @@ PRODUCT_COPY_FILES += \
 
 # Camera
 PRODUCT_PACKAGES += \
+    Camera2 \
     libshim_camera \
     libshim_sensor \
     urandom_init
