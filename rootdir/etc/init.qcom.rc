@@ -337,6 +337,7 @@ on post-fs-data
     chmod 0660 /data/hostapd/hostapd.conf
 
     mkdir /data/audio 0770 media audio
+    mkdir /data/mediaserver 0775 audioserver audioserver
 
     # Enable Power save functionality for modem
     setprop persist.radio.add_power_save 1
