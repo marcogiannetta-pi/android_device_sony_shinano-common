@@ -286,6 +286,7 @@ on post-fs-data
 
     # Create directory used by audio subsystem
     mkdir /data/misc/audio 0770 audio audio
+    mkdir /data/mediaserver 0775 audioserver audioserver
 
     # IR Blaster
     chown system system /dev/ttyHSL2
