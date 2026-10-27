@@ -77,3 +77,16 @@ PRODUCT_PROPERTY_OVERRIDES += \
     ro.lmk.downgrade_pressure=100 \
     dalvik.vm.dex2oat-threads=2 \
     dalvik.vm.boot-dex2oat-threads=4
+
+# Graphics & SurfaceFlinger
+PRODUCT_PROPERTY_OVERRIDES += \
+    ro.surface_flinger.supports_background_blur=0 \
+    debug.sf.disable_backpressure=1 \
+    debug.sf.latch_unsignaled=1
+
+# Background App Limits & ART Memory
+PRODUCT_PROPERTY_OVERRIDES += \
+    ro.sys.fw.bg_apps_limit=20 \
+    dalvik.vm.dex2oat-Xmx=256m \
+    dalvik.vm.image-dex2oat-threads=2 \
+    dalvik.vm.image-dex2oat-Xmx=64m

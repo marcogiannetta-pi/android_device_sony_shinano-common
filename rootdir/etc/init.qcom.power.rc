@@ -113,6 +113,8 @@ on property:dev.bootcomplete=1
     write /proc/sys/vm/dirty_background_ratio 10
     write /proc/sys/vm/dirty_ratio 20
     write /proc/sys/vm/vfs_cache_pressure 80
+    write /proc/sys/vm/min_free_kbytes 16384
+    write /proc/sys/vm/extra_free_kbytes 24576
     setprop vendor.post_boot.parsed 1
     # Do not start mpdecision: CPU core offlining crashes SLUB allocator in Linux 3.4
     # start mpdecision
