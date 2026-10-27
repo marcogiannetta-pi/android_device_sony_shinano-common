@@ -11,6 +11,7 @@ echo "Patches Dir:  ${SCRIPT_DIR}"
 echo ""
 
 declare -A PATCH_MAP=(
+    ["frameworks_av"]="frameworks/av"
     ["frameworks_native"]="frameworks/native"
     ["hardware_broadcom_fm"]="hardware/broadcom/fm"
     ["hardware_interfaces"]="hardware/interfaces"

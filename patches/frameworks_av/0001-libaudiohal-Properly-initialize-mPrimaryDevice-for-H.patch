@@ -1,0 +1,60 @@
+From b6837764be5baa1ce9fb6bcf85abbc508ea6271e Mon Sep 17 00:00:00 2001
+From: mgiannetta <marcogiannetta96@gmail.com>
+Date: Tue, 27 Oct 2026 15:33:00 +0100
+Subject: [PATCH] libaudiohal: Properly initialize mPrimaryDevice for HIDL <=
+ 3.0
+
+---
+ media/libaudiohal/impl/DeviceHalHidl.cpp         | 9 ++++++++-
+ media/libaudiohal/impl/DevicesFactoryHalHidl.cpp | 8 +++++++-
+ 2 files changed, 15 insertions(+), 2 deletions(-)
+
+diff --git a/media/libaudiohal/impl/DeviceHalHidl.cpp b/media/libaudiohal/impl/DeviceHalHidl.cpp
+index 3404d14476..67010425b1 100644
+--- a/media/libaudiohal/impl/DeviceHalHidl.cpp
++++ b/media/libaudiohal/impl/DeviceHalHidl.cpp
+@@ -72,6 +72,9 @@ public:
+ DeviceHalHidl::DeviceHalHidl(const sp<::android::hardware::audio::CPP_VERSION::IDevice>& device)
+         : CoreConversionHelperHidl("DeviceHalHidl"),
+           mDevice(device),
++#if MAJOR_VERSION <= 3
++          mPrimaryDevice(::android::hardware::audio::CPP_VERSION::IPrimaryDevice::castFrom(device)),
++#endif
+           mSoundDoseWrapper(std::make_unique<DeviceHalHidl::SoundDoseWrapper>()) {
+ }
+ 
+@@ -160,7 +163,11 @@ status_t DeviceHalHidl::getMasterVolume(float *volume) {
+ status_t DeviceHalHidl::setMode(audio_mode_t mode) {
+     TIME_CHECK();
+     if (mDevice == 0) return NO_INIT;
+-    if (mPrimaryDevice == 0) return INVALID_OPERATION;
++    if (mPrimaryDevice == 0) {
++        ALOGE("DeviceHalHidl::setMode: mPrimaryDevice is null!");
++        return INVALID_OPERATION;
++    }
++    ALOGI("DeviceHalHidl::setMode: setting mode %d on mPrimaryDevice", mode);
+     return processReturn("setMode", mPrimaryDevice->setMode(AudioMode(mode)));
+ }
+ 
+diff --git a/media/libaudiohal/impl/DevicesFactoryHalHidl.cpp b/media/libaudiohal/impl/DevicesFactoryHalHidl.cpp
+index e35f516898..a72fb1d6e0 100644
+--- a/media/libaudiohal/impl/DevicesFactoryHalHidl.cpp
++++ b/media/libaudiohal/impl/DevicesFactoryHalHidl.cpp
+@@ -131,7 +131,13 @@ status_t DevicesFactoryHalHidl::openDevice(const char *name, sp<DeviceHalInterfa
+                         const sp<::android::hardware::audio::CPP_VERSION::IDevice>& result) {
+                         retval = r;
+                         if (retval == Result::OK) {
+-                            *device = new DeviceHalHidl(result);
++                            sp<::android::hardware::audio::CPP_VERSION::IPrimaryDevice> primary =
++                                    ::android::hardware::audio::CPP_VERSION::IPrimaryDevice::castFrom(result);
++                            if (primary != nullptr) {
++                                *device = new DeviceHalHidl(primary);
++                            } else {
++                                *device = new DeviceHalHidl(result);
++                            }
+                         }
+                     });
+ #else
+-- 
+2.53.0
+
