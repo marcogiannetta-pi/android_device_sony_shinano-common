@@ -69,3 +69,11 @@ PRODUCT_PROPERTY_OVERRIDES += \
     ro.semc.version.sw_type=user \
     ro.semc.version.fs_revision=23.5.A.1.291 \
     ro.semc.version.fs=GENERIC
+
+# LMKD & Low-RAM Optimizations
+PRODUCT_PROPERTY_OVERRIDES += \
+    ro.lmk.use_psi=false \
+    ro.lmk.use_minfree_levels=true \
+    ro.lmk.downgrade_pressure=100 \
+    dalvik.vm.dex2oat-threads=2 \
+    dalvik.vm.boot-dex2oat-threads=4
