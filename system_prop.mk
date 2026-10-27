@@ -84,9 +84,6 @@ PRODUCT_PROPERTY_OVERRIDES += \
     debug.sf.disable_backpressure=1 \
     debug.sf.latch_unsignaled=1
 
-# Background App Limits & ART Memory
+# Background App Limits
 PRODUCT_PROPERTY_OVERRIDES += \
-    ro.sys.fw.bg_apps_limit=20 \
-    dalvik.vm.dex2oat-Xmx=256m \
-    dalvik.vm.image-dex2oat-threads=2 \
-    dalvik.vm.image-dex2oat-Xmx=64m
+    ro.sys.fw.bg_apps_limit=20
