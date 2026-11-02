@@ -22,8 +22,11 @@ COMMON_PATH := device/sony/shinano-common
 BOARD_VENDOR_PLATFORM := shinano
 PRODUCT_PLATFORM := shinano
 
+# Non-A/B device
+AB_OTA_UPDATER := false
+
 # Kernel
-BOARD_KERNEL_CMDLINE := androidboot.hardware=qcom msm_rtb.filter=0x37 ehci-hcd.park=3 dwc3.maximum_speed=high dwc3_msm.prop_chg_detect=Y vmalloc=300M androidboot.selinux=permissive androidboot.boot_device=msm_sdcc.1 androidboot.bootdevice=msm_sdcc.1
+BOARD_KERNEL_CMDLINE := androidboot.hardware=qcom msm_rtb.filter=0x37 ehci-hcd.park=3 dwc3.maximum_speed=high dwc3_msm.prop_chg_detect=Y vmalloc=300M androidboot.selinux=permissive androidboot.boot_device=msm_sdcc.1 androidboot.bootdevice=msm_sdcc.1 androidboot.boot_devices=any
 
 # Audio
 USE_CUSTOM_AUDIO_POLICY := 1
@@ -36,6 +39,7 @@ TARGET_USES_64_BIT_BINDER := true
 BOARD_HAVE_BLUETOOTH_BCM := true
 BOARD_BLUETOOTH_BDROID_BUILDCFG_INCLUDE_DIR := $(COMMON_PATH)/bluetooth
 BOARD_CUSTOM_BT_CONFIG := $(COMMON_PATH)/bluetooth/vnd_shinano.txt
+PRODUCT_SOONG_NAMESPACES += hardware/broadcom/libbt
 
 # BT/FM (Broadcom): Adjust the sysfs patch for 3.4 kernel
 BOARD_HAVE_BCM_FM_SYSFS := "/sys/bus/platform/drivers/bcm_ldisc/bcm_ldisc/"
@@ -52,7 +56,7 @@ TARGET_INIT_VENDOR_LIB := //$(COMMON_PATH):libinit_shinano
 
 # Recovery
 TARGET_RECOVERY_FSTAB := $(COMMON_PATH)/rootdir/etc/fstab.qcom
-TARGET_RECOVERY_PIXEL_FORMAT := "RGBX_8888"
+TARGET_RECOVERY_PIXEL_FORMAT := RGBX_8888
 
 # SELinux
 BOARD_SEPOLICY_DIRS += \

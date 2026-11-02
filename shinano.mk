@@ -47,6 +47,7 @@ PRODUCT_PACKAGES += \
 
 PRODUCT_COPY_FILES += \
     $(COMMON_PATH)/bluetooth/bt_vendor.conf:$(TARGET_COPY_OUT_VENDOR)/etc/bluetooth/bt_vendor.conf \
+    $(COMMON_PATH)/bluetooth/bt_stack.conf:$(TARGET_COPY_OUT_VENDOR)/etc/bluetooth/bt_stack.conf \
     $(COMMON_PATH)/bluetooth/bt_vendor.conf:system/etc/bluetooth/bt_vendor.conf
 
 # Camera
@@ -94,7 +95,6 @@ PRODUCT_PACKAGES += \
     android.hardware.nfc@1.0-impl \
     android.hardware.nfc@1.0-service \
     com.android.nfc_extras \
-    NfcNci \
     nfc_nci.msm8974
 
 PRODUCT_PACKAGES += \
@@ -150,6 +150,10 @@ PRODUCT_PACKAGES += \
 
 # Include BCM Wifi
 $(call inherit-product-if-exists, hardware/broadcom/wlan/bcmdhd/config/config-bcm.mk)
+
+# Disable compressed APEX on legacy kernel 3.4
+PRODUCT_COMPRESSED_APEX := false
+OVERRIDE_PRODUCT_COMPRESSED_APEX := false
 
 # Call the proprietary setup
 $(call inherit-product, vendor/sony/shinano-common/shinano-common-vendor.mk)
