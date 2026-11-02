@@ -20,6 +20,7 @@ declare -A PATCH_MAP=(
     ["lineage-sdk"]="lineage-sdk"
     ["packages_apps_Settings"]="packages/apps/Settings"
     ["packages_apps_Trebuchet"]="packages/apps/Trebuchet"
+    ["packages_modules_Bluetooth"]="packages/modules/Bluetooth"
     ["packages_modules_IntentResolver"]="packages/modules/IntentResolver"
     ["packages_providers_ContactsProvider"]="packages/providers/ContactsProvider"
     ["packages_services_Mms"]="packages/services/Mms"

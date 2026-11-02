@@ -1,0 +1,56 @@
+diff --git a/system/gd/hal/hci_backend_hidl.cc b/system/gd/hal/hci_backend_hidl.cc
+index 0fb2729..223fb68 100644
+--- a/system/gd/hal/hci_backend_hidl.cc
++++ b/system/gd/hal/hci_backend_hidl.cc
+@@ -87,7 +87,7 @@ class HidlHci : public HciBackend {
+ public:
+   HidlHci(Handler* module_handler) {
+     log::info("Trying to find a HIDL interface");
+-    const int32_t timeout_ms = get_adjusted_timeout(500);
++    const int32_t timeout_ms = get_adjusted_timeout(10000);
+ 
+     auto get_service_alarm = new os::Alarm(module_handler);
+     get_service_alarm->Schedule(
+@@ -100,14 +100,8 @@ public:
+                               board_name.has_value() && board_name.value() == kCuttlefishBoard;
+                       if (emulator) {
+                         log::error("board_name: {}", board_name.value());
+-                        log::error(
+-                                "Unable to get a Bluetooth service after {}ms, start "
+-                                "the HAL before starting "
+-                                "Bluetooth",
+-                                timeout_ms);
+-                        return;
+                       }
+-                      log::fatal(
++                      log::error(
+                               "Unable to get a Bluetooth service after {}ms, start "
+                               "the HAL before starting "
+                               "Bluetooth",
+@@ -116,11 +110,11 @@ public:
+                     timeout_ms),
+             std::chrono::milliseconds(timeout_ms));
+ 
+-    hci_1_1_ = IBluetoothHci_1_1::getService();
++    hci_1_1_ = IBluetoothHci_1_1::tryGetService();
+     if (hci_1_1_) {
+       hci_ = hci_1_1_;
+     } else {
+-      hci_ = IBluetoothHci_1_0::getService();
++      hci_ = IBluetoothHci_1_0::tryGetService();
+     }
+ 
+     get_service_alarm->Cancel();
+diff --git a/system/gd/stack_manager.cc b/system/gd/stack_manager.cc
+index 856d10a..21ce7f4 100644
+--- a/system/gd/stack_manager.cc
++++ b/system/gd/stack_manager.cc
+@@ -96,7 +96,7 @@ void StackManager::handle_shut_down(std::promise<void> promise) {
+ std::chrono::milliseconds StackManager::get_gd_stack_timeout_ms(bool is_start) {
+   auto gd_timeout = os::GetSystemPropertyUint32(
+           is_start ? "bluetooth.gd.start_timeout" : "bluetooth.gd.stop_timeout",
+-          /* default_value = */ is_start ? 3000 : 5000);
++          /* default_value = */ is_start ? 10000 : 5000);
+   return std::chrono::milliseconds(gd_timeout *
+                                    os::GetSystemPropertyUint32("ro.hw_timeout_multiplier",
+                                                                /* default_value = */ 1));

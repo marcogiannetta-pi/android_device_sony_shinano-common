@@ -56,7 +56,10 @@ PRODUCT_PROPERTY_OVERRIDES += \
     bluetooth.a2dp.sink.enabled=false \
     ro.bluetooth.hfp.ver=1.6 \
     ro.bt.bdaddr_path="/data/vendor/bluetooth/bluetooth_bdaddr" \
-    ro.rfkilldisabled=1
+    ro.rfkilldisabled=1 \
+    bluetooth.gd.start_timeout=15000 \
+    bluetooth.gd.stop_timeout=10000 \
+    bluetooth.le.disable_apcf_extended_features=1
 
 # macaddrsetup
 PRODUCT_PROPERTY_OVERRIDES += \
