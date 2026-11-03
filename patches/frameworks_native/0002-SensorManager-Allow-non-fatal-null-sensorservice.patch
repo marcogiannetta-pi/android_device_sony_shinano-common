@@ -1,0 +1,277 @@
+From 6ae608d3a58c1628823bfc94d8948b6225eead3b Mon Sep 17 00:00:00 2001
+From: mgiannetta <marcogiannetta96@gmail.com>
+Date: Tue, 3 Nov 2026 20:34:09 +0100
+Subject: [PATCH] SensorManager: Allow non-fatal null sensorservice
+
+Change-Id: I91bc0e63d5254e7afe18f8d44002c0929eb78c34
+---
+ libs/binder/ProcessState.cpp                  |  6 +-
+ libs/input/KeyLayoutMap.cpp                   |  5 +-
+ libs/renderengine/skia/SkiaRenderEngine.cpp   | 19 ++++++
+ .../skia/compat/GaneshBackendTexture.cpp      | 60 ++++++++++++-------
+ libs/sensor/SensorManager.cpp                 | 36 +++++------
+ services/surfaceflinger/surfaceflinger.rc     |  2 +-
+ 6 files changed, 83 insertions(+), 45 deletions(-)
+
+diff --git a/libs/binder/ProcessState.cpp b/libs/binder/ProcessState.cpp
+index 5e7f151..7ef5c4f 100644
+--- a/libs/binder/ProcessState.cpp
++++ b/libs/binder/ProcessState.cpp
+@@ -439,8 +439,10 @@ void ProcessState::spawnPooledThread(bool isMain)
+ }
+ 
+ status_t ProcessState::setThreadPoolMaxThreadCount(size_t maxThreads) {
+-    LOG_ALWAYS_FATAL_IF(mThreadPoolStarted && maxThreads < mMaxThreads,
+-           "Binder threadpool cannot be shrunk after starting");
++    if (mThreadPoolStarted && maxThreads < mMaxThreads) {
++        ALOGW("Binder threadpool cannot be shrunk after starting (ignoring shrink from %zu to %zu)", size_t(mMaxThreads.load()), maxThreads);
++        return NO_ERROR;
++    }
+     status_t result = NO_ERROR;
+     if (ioctl(mDriverFD, BINDER_SET_MAX_THREADS, &maxThreads) != -1) {
+         mMaxThreads = maxThreads;
+diff --git a/libs/input/KeyLayoutMap.cpp b/libs/input/KeyLayoutMap.cpp
+index f3241c9..d93a4da 100644
+--- a/libs/input/KeyLayoutMap.cpp
++++ b/libs/input/KeyLayoutMap.cpp
+@@ -103,7 +103,10 @@ bool kernelConfigsArePresent(const std::set<std::string>& configs) {
+ 
+     std::map<std::string, std::string> kernelConfigs;
+     const status_t result = android::kernelconfigs::LoadKernelConfigs(&kernelConfigs);
+-    LOG_ALWAYS_FATAL_IF(result != OK, "Kernel configs could not be fetched");
++    if (result != OK) {
++        ALOGW("Kernel configs could not be fetched (%d), ignoring required kernel configs", result);
++        return true;
++    }
+ 
+     for (const std::string& requiredConfig : configs) {
+         const auto configIt = kernelConfigs.find(requiredConfig);
+diff --git a/libs/renderengine/skia/SkiaRenderEngine.cpp b/libs/renderengine/skia/SkiaRenderEngine.cpp
+index dc7a408..7c86ae4 100644
+--- a/libs/renderengine/skia/SkiaRenderEngine.cpp
++++ b/libs/renderengine/skia/SkiaRenderEngine.cpp
+@@ -1041,6 +1041,10 @@ void SkiaRenderEngine::drawLayersInternal(
+                     : item.usePremultipliedAlpha         ? kPremul_SkAlphaType
+                                                          : kUnpremul_SkAlphaType;
+             sk_sp<SkImage> image = imageTextureRef->makeImage(layerDataspace, alphaType);
++            if (!image) {
++                ALOGE("makeImage failed for layer, skipping");
++                continue;
++            }
+ 
+             auto texMatrix = getSkM44(item.textureTransform).asM33();
+             // textureTansform was intended to be passed directly into a shader, so when
+@@ -1231,6 +1235,11 @@ void SkiaRenderEngine::drawGainmapInternal(
+     waitFence(context, sdrFence);
+     const auto sdrTextureRef = getOrCreateBackendTexture(sdr->getBuffer(), false);
+     const auto sdrImage = sdrTextureRef->makeImage(dataspace, kPremul_SkAlphaType);
++    if (!sdrImage) {
++        ALOGE("drawGainmapInternal: sdrImage is null, skipping gainmap draw");
++        resultPromise->set_value(base::unexpected(NO_MEMORY));
++        return;
++    }
+     const auto sdrShader =
+             sdrImage->makeShader(SkTileMode::kClamp, SkTileMode::kClamp,
+                                  SkSamplingOptions({SkFilterMode::kLinear, SkMipmapMode::kNone}),
+@@ -1238,6 +1247,11 @@ void SkiaRenderEngine::drawGainmapInternal(
+     waitFence(context, hdrFence);
+     const auto hdrTextureRef = getOrCreateBackendTexture(hdr->getBuffer(), false);
+     const auto hdrImage = hdrTextureRef->makeImage(dataspace, kPremul_SkAlphaType);
++    if (!hdrImage) {
++        ALOGE("drawGainmapInternal: hdrImage is null, skipping gainmap draw");
++        resultPromise->set_value(base::unexpected(NO_MEMORY));
++        return;
++    }
+     const auto hdrShader =
+             hdrImage->makeShader(SkTileMode::kClamp, SkTileMode::kClamp,
+                                  SkSamplingOptions({SkFilterMode::kLinear, SkMipmapMode::kNone}),
+@@ -1246,6 +1260,11 @@ void SkiaRenderEngine::drawGainmapInternal(
+     static GainmapFactory kGainmapFactory;
+     const auto gainmapShader = kGainmapFactory.createSkShader(sdrShader, hdrShader, hdrSdrRatio);
+ 
++    if (!dstSurface) {
++        ALOGE("drawGainmapInternal: dstSurface is null, skipping gainmap draw");
++        resultPromise->set_value(base::unexpected(NO_MEMORY));
++        return;
++    }
+     const auto canvas = dstSurface->getCanvas();
+     SkPaint paint;
+     paint.setShader(gainmapShader);
+diff --git a/libs/renderengine/skia/compat/GaneshBackendTexture.cpp b/libs/renderengine/skia/compat/GaneshBackendTexture.cpp
+index 88282e7..292ea60 100644
+--- a/libs/renderengine/skia/compat/GaneshBackendTexture.cpp
++++ b/libs/renderengine/skia/compat/GaneshBackendTexture.cpp
+@@ -96,6 +96,24 @@ sk_sp<SkImage> GaneshBackendTexture::makeImage(SkAlphaType alphaType, ui::Datasp
+             SkImages::BorrowTextureFrom(mGrContext.get(), mBackendTexture, kTopLeft_GrSurfaceOrigin,
+                                         colorType, alphaType, toSkColorSpace(dataspace),
+                                         releaseImageProc, releaseContext);
++    if (!image) {
++        // Fallback 1: try with nullptr color space
++        image = SkImages::BorrowTextureFrom(mGrContext.get(), mBackendTexture, kTopLeft_GrSurfaceOrigin,
++                                            colorType, alphaType, nullptr,
++                                            releaseImageProc, releaseContext);
++    }
++    if (!image) {
++        // Fallback 2: try with standard RGBA_8888 and nullptr color space
++        image = SkImages::BorrowTextureFrom(mGrContext.get(), mBackendTexture, kTopLeft_GrSurfaceOrigin,
++                                            kRGBA_8888_SkColorType, alphaType, nullptr,
++                                            releaseImageProc, releaseContext);
++    }
++    if (!image) {
++        // Fallback 3: try with RGBA_8888 and Premul alpha
++        image = SkImages::BorrowTextureFrom(mGrContext.get(), mBackendTexture, kTopLeft_GrSurfaceOrigin,
++                                            kRGBA_8888_SkColorType, kPremul_SkAlphaType, nullptr,
++                                            releaseImageProc, releaseContext);
++    }
+     if (!image) {
+         logFatalTexture("Unable to generate SkImage.", dataspace, colorType);
+     }
+@@ -124,36 +142,36 @@ void GaneshBackendTexture::logFatalTexture(const char* msg, ui::Dataspace datasp
+             GrGLTextureInfo textureInfo;
+             bool retrievedTextureInfo =
+                     GrBackendTextures::GetGLTextureInfo(mBackendTexture, &textureInfo);
+-            LOG_ALWAYS_FATAL("%s isTextureValid:%d dataspace:%d"
+-                             "\n\tGrBackendTexture: (%i x %i) hasMipmaps: %i isProtected: %i "
+-                             "texType: %i\n\t\tGrGLTextureInfo: success: %i fTarget: %u fFormat: %u"
+-                             " colorType %i",
+-                             msg, mBackendTexture.isValid(), static_cast<int32_t>(dataspace),
+-                             mBackendTexture.width(), mBackendTexture.height(),
+-                             mBackendTexture.hasMipmaps(), mBackendTexture.isProtected(),
+-                             static_cast<int>(mBackendTexture.textureType()), retrievedTextureInfo,
+-                             textureInfo.fTarget, textureInfo.fFormat, colorType);
++            ALOGE("%s isTextureValid:%d dataspace:%d"
++                  "\n\tGrBackendTexture: (%i x %i) hasMipmaps: %i isProtected: %i "
++                  "texType: %i\n\t\tGrGLTextureInfo: success: %i fTarget: %u fFormat: %u"
++                  " colorType %i",
++                  msg, mBackendTexture.isValid(), static_cast<int32_t>(dataspace),
++                  mBackendTexture.width(), mBackendTexture.height(),
++                  mBackendTexture.hasMipmaps(), mBackendTexture.isProtected(),
++                  static_cast<int>(mBackendTexture.textureType()), retrievedTextureInfo,
++                  textureInfo.fTarget, textureInfo.fFormat, colorType);
+             break;
+         }
+         case GrBackendApi::kVulkan: {
+             GrVkImageInfo imageInfo;
+             bool retrievedImageInfo =
+                     GrBackendTextures::GetVkImageInfo(mBackendTexture, &imageInfo);
+-            LOG_ALWAYS_FATAL("%s isTextureValid:%d dataspace:%d"
+-                             "\n\tGrBackendTexture: (%i x %i) hasMipmaps: %i isProtected: %i "
+-                             "texType: %i\n\t\tVkImageInfo: success: %i fFormat: %i "
+-                             "fSampleCount: %u fLevelCount: %u colorType %i",
+-                             msg, mBackendTexture.isValid(), static_cast<int32_t>(dataspace),
+-                             mBackendTexture.width(), mBackendTexture.height(),
+-                             mBackendTexture.hasMipmaps(), mBackendTexture.isProtected(),
+-                             static_cast<int>(mBackendTexture.textureType()), retrievedImageInfo,
+-                             imageInfo.fFormat, imageInfo.fSampleCount, imageInfo.fLevelCount,
+-                             colorType);
++            ALOGE("%s isTextureValid:%d dataspace:%d"
++                  "\n\tGrBackendTexture: (%i x %i) hasMipmaps: %i isProtected: %i "
++                  "texType: %i\n\t\tVkImageInfo: success: %i fFormat: %i "
++                  "fSampleCount: %u fLevelCount: %u colorType %i",
++                  msg, mBackendTexture.isValid(), static_cast<int32_t>(dataspace),
++                  mBackendTexture.width(), mBackendTexture.height(),
++                  mBackendTexture.hasMipmaps(), mBackendTexture.isProtected(),
++                  static_cast<int>(mBackendTexture.textureType()), retrievedImageInfo,
++                  imageInfo.fFormat, imageInfo.fSampleCount, imageInfo.fLevelCount,
++                  colorType);
+             break;
+         }
+         default:
+-            LOG_ALWAYS_FATAL("%s Unexpected backend %u", msg,
+-                             static_cast<unsigned>(mBackendTexture.backend()));
++            ALOGE("%s Unexpected backend %u", msg,
++                  static_cast<unsigned>(mBackendTexture.backend()));
+             break;
+     }
+ }
+diff --git a/libs/sensor/SensorManager.cpp b/libs/sensor/SensorManager.cpp
+index 7b4a86c..8074d96 100644
+--- a/libs/sensor/SensorManager.cpp
++++ b/libs/sensor/SensorManager.cpp
+@@ -123,7 +123,7 @@ SensorManager& SensorManager::getInstanceForPackage(const String16& packageName)
+     // to the wrong package and stats based on app ops may be slightly off.
+     String16 opPackageName = packageName;
+     if (opPackageName.size() <= 0) {
+-        sp<IBinder> binder = defaultServiceManager()->getService(String16("permission"));
++        sp<IBinder> binder = defaultServiceManager()->checkService(String16("permission"));
+         if (binder != nullptr) {
+             Vector<String16> packages;
+             interface_cast<IPermissionController>(binder)->getPackagesForUid(uid, packages);
+@@ -133,7 +133,7 @@ SensorManager& SensorManager::getInstanceForPackage(const String16& packageName)
+                 ALOGE("No packages for calling UID");
+             }
+         } else {
+-            ALOGE("Cannot get permission service");
++            ALOGD("Cannot get permission service (vendor context?)");
+         }
+     }
+ 
+@@ -175,25 +175,18 @@ SensorManager::~SensorManager() {
+ }
+ 
+ status_t SensorManager::waitForSensorService(sp<ISensorServer> *server) {
+-    // try for 300 seconds (60*5(getService() tries for 5 seconds)) before giving up ...
+-    sp<ISensorServer> s;
+-    const String16 name("sensorservice");
+-    for (int i = 0; i < 60; i++) {
+-        status_t err = getService(name, &s);
+-        switch (err) {
+-            case NAME_NOT_FOUND:
+-                sleep(1);
+-                continue;
+-            case NO_ERROR:
+-                if (server != nullptr) {
+-                    *server = s;
+-                }
+-                return NO_ERROR;
+-            default:
+-                return err;
++    sp<IBinder> binder = defaultServiceManager()->checkService(String16("sensorservice"));
++    if (binder == nullptr) {
++        return NAME_NOT_FOUND;
++    }
++    sp<ISensorServer> s = interface_cast<ISensorServer>(binder);
++    if (s != nullptr) {
++        if (server != nullptr) {
++            *server = s;
+         }
++        return NO_ERROR;
+     }
+-    return TIMED_OUT;
++    return NAME_NOT_FOUND;
+ }
+ 
+ void SensorManager::sensorManagerDied() {
+@@ -224,7 +217,9 @@ status_t SensorManager::assertStateLocked() {
+     if (initSensorManager) {
+ #endif
+         waitForSensorService(&mSensorServer);
+-        LOG_ALWAYS_FATAL_IF(mSensorServer == nullptr, "getService(SensorService) NULL");
++        if (mSensorServer == nullptr) {
++            return NO_INIT;
++        }
+ 
+         class DeathObserver : public IBinder::DeathRecipient {
+             SensorManager& mSensorManager;
+@@ -264,6 +259,7 @@ ssize_t SensorManager::getSensorList(Sensor const* const** list) {
+     Mutex::Autolock _l(mLock);
+     status_t err = assertStateLocked();
+     if (err < 0) {
++        if (list) *list = nullptr;
+         return static_cast<ssize_t>(err);
+     }
+     *list = mSensorList;
+diff --git a/services/surfaceflinger/surfaceflinger.rc b/services/surfaceflinger/surfaceflinger.rc
+index dfdd4aa..9db1ccf 100644
+--- a/services/surfaceflinger/surfaceflinger.rc
++++ b/services/surfaceflinger/surfaceflinger.rc
+@@ -3,5 +3,5 @@ service surfaceflinger /system/bin/surfaceflinger
+     user system
+     group graphics drmrpc readproc
+     capabilities SYS_NICE
+-    onrestart restart --only-if-running zygote
++    # onrestart restart --only-if-running zygote
+     task_profiles HighPerformance
+-- 
+2.53.0
+

@@ -29,6 +29,7 @@ declare -A PATCH_MAP=(
     ["hardware_sony_thermanager"]="hardware/sony/thermanager"
     ["libcore"]="libcore"
     ["packages_apps_Camera2"]="packages/apps/Camera2"
+    ["packages_apps_Settings"]="packages/apps/Settings"
     ["packages_modules_adb"]="packages/modules/adb"
     ["packages_modules_Bluetooth"]="packages/modules/Bluetooth"
     ["packages_modules_Connectivity"]="packages/modules/Connectivity"

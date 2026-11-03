@@ -1,0 +1,59 @@
+From f94c2d26e9f0c0a8673ff9d77703a21e297b9d47 Mon Sep 17 00:00:00 2001
+From: mgiannetta <marcogiannetta96@gmail.com>
+Date: Tue, 3 Nov 2026 20:35:45 +0100
+Subject: [PATCH] Settings: Fix USB preferences for devices without port status
+ (legacy microUSB)
+
+Change-Id: Ifcab65a97e5fc6e3d9ed94eabbf583bba383ee7b
+---
+ .../settings/connecteddevice/usb/UsbBackend.java | 16 ++++++++++------
+ 1 file changed, 10 insertions(+), 6 deletions(-)
+
+diff --git a/src/com/android/settings/connecteddevice/usb/UsbBackend.java b/src/com/android/settings/connecteddevice/usb/UsbBackend.java
+index 6e643f4..2a281da 100644
+--- a/src/com/android/settings/connecteddevice/usb/UsbBackend.java
++++ b/src/com/android/settings/connecteddevice/usb/UsbBackend.java
+@@ -111,12 +111,12 @@ public class UsbBackend {
+ 
+     public int getPowerRole() {
+         updatePorts();
+-        return mPortStatus == null ? POWER_ROLE_NONE : mPortStatus.getCurrentPowerRole();
++        return mPortStatus == null ? POWER_ROLE_SINK : mPortStatus.getCurrentPowerRole();
+     }
+ 
+     public int getDataRole() {
+         updatePorts();
+-        return mPortStatus == null ? DATA_ROLE_NONE : mPortStatus.getCurrentDataRole();
++        return mPortStatus == null ? DATA_ROLE_DEVICE : mPortStatus.getCurrentDataRole();
+     }
+ 
+     public void setPowerRole(int role) {
+@@ -166,8 +166,10 @@ public class UsbBackend {
+     }
+ 
+     public boolean isSingleDataRoleSupported() {
+-        return mPort != null && mPortStatus != null
+-                && ((!mPortStatus
++        if (mPort == null || mPortStatus == null) {
++            return true;
++        }
++        return ((!mPortStatus
+                 .isRoleCombinationSupported(POWER_ROLE_SINK, DATA_ROLE_HOST)
+                 && !mPortStatus
+                 .isRoleCombinationSupported(POWER_ROLE_SOURCE, DATA_ROLE_HOST))
+@@ -178,8 +180,10 @@ public class UsbBackend {
+     }
+ 
+     public boolean isSinglePowerRoleSupported() {
+-        return mPort != null && mPortStatus != null
+-                && ((!mPortStatus
++        if (mPort == null || mPortStatus == null) {
++            return true;
++        }
++        return ((!mPortStatus
+                 .isRoleCombinationSupported(POWER_ROLE_SINK, DATA_ROLE_DEVICE)
+                 && !mPortStatus
+                 .isRoleCombinationSupported(POWER_ROLE_SINK, DATA_ROLE_HOST))
+-- 
+2.53.0
+
