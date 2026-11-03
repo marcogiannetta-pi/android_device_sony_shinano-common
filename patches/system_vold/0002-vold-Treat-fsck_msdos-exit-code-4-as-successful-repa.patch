@@ -1,0 +1,33 @@
+From 1a93d636beb5d8f71ca5139d99cf3d8a88341948 Mon Sep 17 00:00:00 2001
+From: mgiannetta <marcogiannetta96@gmail.com>
+Date: Tue, 3 Nov 2026 20:54:45 +0100
+Subject: [PATCH] vold: Treat fsck_msdos exit code 4 as successful repair
+
+Change-Id: I69c0e22948bc38b9138b0bf082ef11e92654da24
+---
+ fs/Vfat.cpp | 9 ++-------
+ 1 file changed, 2 insertions(+), 7 deletions(-)
+
+diff --git a/fs/Vfat.cpp b/fs/Vfat.cpp
+index 66d6a69..b99264e 100644
+--- a/fs/Vfat.cpp
++++ b/fs/Vfat.cpp
+@@ -91,13 +91,8 @@ status_t Check(const std::string& source) {
+                 return -1;
+ 
+             case 4:
+-                if (pass++ <= 3) {
+-                    LOG(WARNING) << "Filesystem modified - rechecking (pass " << pass << ")";
+-                    continue;
+-                }
+-                LOG(ERROR) << "Failing check after too many rechecks";
+-                errno = EIO;
+-                return -1;
++                LOG(INFO) << "Filesystem modified - repaired successfully";
++                return 0;
+ 
+             case 8:
+                 LOG(ERROR) << "Filesystem check failed (no filesystem)";
+-- 
+2.53.0
+
