@@ -1,5 +1,52 @@
+diff --git a/audio/common/all-versions/default/service/service.cpp b/audio/common/all-versions/default/service/service.cpp
+index 1557a95..8ca4c9f 100644
+--- a/audio/common/all-versions/default/service/service.cpp
++++ b/audio/common/all-versions/default/service/service.cpp
+@@ -102,6 +102,7 @@ int main(int /* argc */, char* /* argv */ []) {
+             "android.hardware.audio@6.0::IDevicesFactory",
+             "android.hardware.audio@5.0::IDevicesFactory",
+             "android.hardware.audio@4.0::IDevicesFactory",
++            "android.hardware.audio@2.0::IDevicesFactory",
+         },
+         {
+             "Audio Effect API",
+@@ -109,6 +110,7 @@ int main(int /* argc */, char* /* argv */ []) {
+             "android.hardware.audio.effect@6.0::IEffectsFactory",
+             "android.hardware.audio.effect@5.0::IEffectsFactory",
+             "android.hardware.audio.effect@4.0::IEffectsFactory",
++            "android.hardware.audio.effect@2.0::IEffectsFactory",
+         }
+     };
+ 
+@@ -148,8 +150,8 @@ int main(int /* argc */, char* /* argv */ []) {
+     for (const auto& listIter : mandatoryInterfaces) {
+         auto iter = listIter.begin();
+         const std::string& interfaceFamilyName = *iter++;
+-        LOG_ALWAYS_FATAL_IF(!registerPassthroughServiceImplementations(iter, listIter.end()),
+-                            "Could not register %s", interfaceFamilyName.c_str());
++        ALOGW_IF(!registerPassthroughServiceImplementations(iter, listIter.end()),
++                 "Could not register %s", interfaceFamilyName.c_str());
+     }
+ 
+     for (const auto& listIter : optionalInterfaces) {
+diff --git a/bluetooth/1.0/default/bluetooth_hci.cc b/bluetooth/1.0/default/bluetooth_hci.cc
+index a2211f4..02c387e 100644
+--- a/bluetooth/1.0/default/bluetooth_hci.cc
++++ b/bluetooth/1.0/default/bluetooth_hci.cc
+@@ -112,7 +112,10 @@ Return<void> BluetoothHci::initialize(
+ 
+ Return<void> BluetoothHci::close() {
+   ALOGI("BluetoothHci::close()");
+-  unlink_cb_(death_recipient_);
++  if (unlink_cb_) {
++    unlink_cb_(death_recipient_);
++    unlink_cb_ = nullptr;
++  }
+   VendorInterface::Shutdown();
+   return Void();
+ }
 diff --git a/bluetooth/1.0/default/h4_protocol.cc b/bluetooth/1.0/default/h4_protocol.cc
-index 24596879d0..deb816a5dc 100644
+index 2459687..deb816a 100644
 --- a/bluetooth/1.0/default/h4_protocol.cc
 +++ b/bluetooth/1.0/default/h4_protocol.cc
 @@ -80,9 +80,29 @@ size_t H4Protocol::Send(uint8_t type, const uint8_t* data, size_t length) {
@@ -68,7 +115,7 @@ index 24596879d0..deb816a5dc 100644
    } else {
      hci_packetizer_.OnDataReady(fd, hci_packet_type_);
 diff --git a/bluetooth/1.0/default/hci_packetizer.h b/bluetooth/1.0/default/hci_packetizer.h
-index 90579bd2a7..17d30b4eef 100644
+index 90579bd..17d30b4 100644
 --- a/bluetooth/1.0/default/hci_packetizer.h
 +++ b/bluetooth/1.0/default/hci_packetizer.h
 @@ -35,6 +35,11 @@ class HciPacketizer {

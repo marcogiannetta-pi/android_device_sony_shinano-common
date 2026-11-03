@@ -1,0 +1,84 @@
+From e3b3afc02663db40997473389ac127ae6134bfd1 Mon Sep 17 00:00:00 2001
+From: mgiannetta <marcogiannetta96@gmail.com>
+Date: Tue, 3 Nov 2026 17:20:59 +0100
+Subject: [PATCH] broadcom/fm: fix compilation on Android 15
+
+Change-Id: I2b7d49ddbb744475d07d269da190723c5c1a6d7f
+---
+ Android.mk                   | 5 +++--
+ brcm-uim-sysfs/uim.c         | 2 +-
+ brcm-uim-sysfs/upio.c        | 2 +-
+ fmradio.v4l2-fm/v4l2_fm.c    | 2 +-
+ fmradio.v4l2-fm/v4l2_ioctl.c | 2 +-
+ 5 files changed, 7 insertions(+), 6 deletions(-)
+
+diff --git a/Android.mk b/Android.mk
+index 9e008d2..6b0fe86 100644
+--- a/Android.mk
++++ b/Android.mk
+@@ -1,7 +1,8 @@
+ ifeq ($(BOARD_HAVE_BCM_FM), true)
+ 
+-LOCAL_PATH := $(call my-dir)
++FM_PATH := $(call my-dir)
+ 
+-include $(call all-makefiles-under,$(LOCAL_PATH))
++include $(FM_PATH)/brcm-uim-sysfs/Android.mk
++include $(FM_PATH)/fmradio.v4l2-fm/Android.mk
+ 
+ endif
+diff --git a/brcm-uim-sysfs/uim.c b/brcm-uim-sysfs/uim.c
+index 3c30411..f66e70a 100755
+--- a/brcm-uim-sysfs/uim.c
++++ b/brcm-uim-sysfs/uim.c
+@@ -1416,7 +1416,7 @@ int main(void)
+     /* Read configuration parameters for hci snoop */
+     if (vnd_load_conf(STACK_CONF_FILE, &stack_conf_table[0]))
+     {
+-        return UIM_FAIL;
++        UIM_VER("STACK_CONF_FILE %s not loaded, continuing without snoop", STACK_CONF_FILE);
+     }
+ #endif
+ 
+diff --git a/brcm-uim-sysfs/upio.c b/brcm-uim-sysfs/upio.c
+index c2a9e79..a38942e 100755
+--- a/brcm-uim-sysfs/upio.c
++++ b/brcm-uim-sysfs/upio.c
+@@ -30,7 +30,7 @@
+ 
+ #define LOG_TAG "bt_upio"
+ 
+-#include <utils/Log.h>
++#include <log/log.h>
+ #include <fcntl.h>
+ #include <errno.h>
+ #include <malloc.h>
+diff --git a/fmradio.v4l2-fm/v4l2_fm.c b/fmradio.v4l2-fm/v4l2_fm.c
+index 1d62b1c..6faaa59 100644
+--- a/fmradio.v4l2-fm/v4l2_fm.c
++++ b/fmradio.v4l2-fm/v4l2_fm.c
+@@ -24,7 +24,7 @@
+ #define ALOGI printf
+ #define ALOGE printf
+ #else
+-#include "utils/Log.h"
++#include <log/log.h>
+ #endif
+ 
+ #include <stdio.h>
+diff --git a/fmradio.v4l2-fm/v4l2_ioctl.c b/fmradio.v4l2-fm/v4l2_ioctl.c
+index f705b1b..96a3d60 100644
+--- a/fmradio.v4l2-fm/v4l2_ioctl.c
++++ b/fmradio.v4l2-fm/v4l2_ioctl.c
+@@ -23,7 +23,7 @@
+ #define ALOGI printf
+ #define ALOGE printf
+ #else
+-#include "utils/Log.h"
++#include <log/log.h>
+ #endif
+ 
+ #include "v4l2_ioctl.h"
+-- 
+2.53.0
+

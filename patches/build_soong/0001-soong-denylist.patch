@@ -1,0 +1,13 @@
+diff --git a/ui/build/androidmk_denylist.go b/ui/build/androidmk_denylist.go
+index 6f57cb1..ac676f7 100644
+--- a/ui/build/androidmk_denylist.go
++++ b/ui/build/androidmk_denylist.go
+@@ -31,7 +31,7 @@ var androidmk_denylist []string = []string{
+ 	"frameworks/",
+ 	"hardware/libhardware/",
+ 	"hardware/libhardware_legacy/",
+-	"hardware/ril/",
++	//"hardware/ril/",
+ 	// Do not block other directories in kernel/, see b/319658303.
+ 	"kernel/configs/",
+ 	"kernel/prebuilts/",

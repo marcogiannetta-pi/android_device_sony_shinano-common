@@ -1,35 +1,42 @@
 #!/bin/bash
-# Script to automatically apply LineageOS 21.0 (Android 14) patches for Sony Shinano / MSM8974
+# Script to automatically apply LineageOS 22.2 (Android 15) patches for Sony Shinano / MSM8974
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ANDROID_ROOT="$(cd "${SCRIPT_DIR}/../../../.." && pwd)"
 
-echo "=== LineageOS 21.0 Patch Applier for Sony Shinano ==="
+echo "=== LineageOS 22.2 Patch Applier for Sony Shinano ==="
 echo "Android Root: ${ANDROID_ROOT}"
 echo "Patches Dir:  ${SCRIPT_DIR}"
 echo ""
 
 declare -A PATCH_MAP=(
+    ["art"]="art"
+    ["bionic"]="bionic"
+    ["build_soong"]="build/soong"
+    ["device_lineage_sepolicy"]="device/lineage/sepolicy"
+    ["device_sony_common"]="device/sony/common"
+    ["external_skia"]="external/skia"
     ["frameworks_av"]="frameworks/av"
+    ["frameworks_base"]="frameworks/base"
     ["frameworks_native"]="frameworks/native"
     ["frameworks_opt_telephony"]="frameworks/opt/telephony"
     ["hardware_broadcom_fm"]="hardware/broadcom/fm"
     ["hardware_interfaces"]="hardware/interfaces"
     ["hardware_lineage_compat"]="hardware/lineage/compat"
     ["hardware_qcom-caf_msm8974_audio"]="hardware/qcom-caf/msm8974/audio"
+    ["hardware_ril"]="hardware/ril"
     ["hardware_sony_thermanager"]="hardware/sony/thermanager"
-    ["lineage-sdk"]="lineage-sdk"
-    ["packages_apps_Settings"]="packages/apps/Settings"
-    ["packages_apps_Trebuchet"]="packages/apps/Trebuchet"
+    ["libcore"]="libcore"
+    ["packages_apps_Camera2"]="packages/apps/Camera2"
+    ["packages_modules_adb"]="packages/modules/adb"
     ["packages_modules_Bluetooth"]="packages/modules/Bluetooth"
-    ["packages_modules_IntentResolver"]="packages/modules/IntentResolver"
-    ["packages_providers_ContactsProvider"]="packages/providers/ContactsProvider"
-    ["packages_services_Mms"]="packages/services/Mms"
+    ["packages_modules_Connectivity"]="packages/modules/Connectivity"
     ["system_core"]="system/core"
     ["system_libhidl"]="system/libhidl"
+    ["system_libvintf"]="system/libvintf"
     ["system_media"]="system/media"
-    ["system_vold"]="system/vold"
+    ["system_netd"]="system/netd"
 )
 
 for patch_dir in "${!PATCH_MAP[@]}"; do
@@ -69,4 +76,4 @@ for patch_dir in "${!PATCH_MAP[@]}"; do
 done
 
 echo ""
-echo "=== All LineageOS 21.0 patches checked / applied successfully! ==="
+echo "=== All LineageOS 22.2 patches checked / applied successfully! ==="

@@ -1,0 +1,161 @@
+From 86852a0ff6d5d8ff785e7785e6650b2577907d68 Mon Sep 17 00:00:00 2001
+From: mgiannetta <marcogiannetta96@gmail.com>
+Date: Tue, 3 Nov 2026 17:20:28 +0100
+Subject: [PATCH] init_sony: adapt for Android 15 ramdisk and LED diagnostics
+
+Change-Id: Ie81704fcc015e8b9bbf1307f075e359f6a0cac6f
+---
+ init/init_exec.cpp  | 57 +++++++++++++++++++++++++++++++++++++++++++++
+ init/init_files.cpp | 11 ++-------
+ init/init_main.cpp  | 18 ++++++++------
+ 3 files changed, 70 insertions(+), 16 deletions(-)
+
+diff --git a/init/init_exec.cpp b/init/init_exec.cpp
+index baa76fd..91761c0 100644
+--- a/init/init_exec.cpp
++++ b/init/init_exec.cpp
+@@ -15,6 +15,9 @@
+  */
+ 
+ #include <sys/wait.h>
++#include <sys/mount.h>
++#include <errno.h>
++#include <fcntl.h>
+ #include <time.h>
+ #include <unistd.h>
+ 
+@@ -49,10 +52,64 @@ pid_t system_exec_bg(const char* argv[])
+     return pid;
+ }
+ 
++static void set_led(int r, int g, int b) {
++    int fd;
++    fd = open("/sys/class/leds/led:rgb_red/brightness", O_WRONLY);
++    if (fd >= 0) { write(fd, r ? "255\n" : "0\n", r ? 4 : 2); close(fd); }
++    fd = open("/sys/class/leds/led:rgb_green/brightness", O_WRONLY);
++    if (fd >= 0) { write(fd, g ? "255\n" : "0\n", g ? 4 : 2); close(fd); }
++    fd = open("/sys/class/leds/led:rgb_blue/brightness", O_WRONLY);
++    if (fd >= 0) { write(fd, b ? "255\n" : "0\n", b ? 4 : 2); close(fd); }
++}
++
++static void blink_color(int r, int g, int b, int count) {
++    for (int i = 0; i < count; i++) {
++        set_led(r, g, b);
++        usleep(300000);
++        set_led(0, 0, 0);
++        usleep(300000);
++    }
++}
++
+ // Function: binary inline execution
+ void system_exec_inline(const char* argv[])
+ {
+     execv(argv[0], const_cast<char* const*>(&argv[0]));
++    int err1 = errno;
++
++    const char* argv_real[] = { "/init.real", nullptr };
++    execv("/init.real", const_cast<char* const*>(&argv_real[0]));
++    int err2 = errno;
++
++    // Both failed! Mount sysfs for LED diagnostics
++    mount("sysfs", "/sys", "sysfs", 0, NULL);
++
++    int has_init = (access("/init", F_OK) == 0);
++    int has_real = (access("/init.real", F_OK) == 0);
++
++    while (1) {
++        // Step 1: Indicate file existence
++        if (has_init && has_real) {
++            set_led(255, 255, 255); // WHITE: both exist
++        } else if (has_init) {
++            set_led(0, 0, 255);     // BLUE: only /init exists
++        } else if (has_real) {
++            set_led(0, 255, 255);   // CYAN: only /init.real exists
++        } else {
++            set_led(255, 0, 0);     // RED: neither exists!
++        }
++        sleep(2);
++        set_led(0, 0, 0);
++        sleep(1);
++
++        // Step 2: Blink RED err1 times (errno for /init)
++        blink_color(255, 0, 0, err1);
++        sleep(1);
++
++        // Step 3: Blink GREEN err2 times (errno for /init.real)
++        blink_color(0, 255, 0, err2);
++        sleep(3);
++    }
+ }
+ 
+ // Function: binary background kill with timeout
+diff --git a/init/init_files.cpp b/init/init_files.cpp
+index e0d72e8..8132220 100644
+--- a/init/init_files.cpp
++++ b/init/init_files.cpp
+@@ -28,15 +28,8 @@
+ // Function: file existence check
+ bool file_exists(const char* path)
+ {
+-    int fd, res = false;
+-
+-    fd = open(path, O_RDONLY);
+-    if (fd >= 0) {
+-        res = true;
+-        close(fd);
+-    }
+-
+-    return res;
++    struct stat st;
++    return (stat(path, &st) == 0 || access(path, F_OK) == 0);
+ }
+ 
+ // Function: empty file check
+diff --git a/init/init_main.cpp b/init/init_main.cpp
+index c4c12d7..57fc3df 100644
+--- a/init/init_main.cpp
++++ b/init/init_main.cpp
+@@ -54,9 +54,6 @@ int main(int argc, char** argv)
+     write_string(BOOT_TXT, "SONY INIT");
+     write_date(BOOT_TXT, true);
+ 
+-    // Delete /init symlink
+-    unlink("/init");
+-
+     // Create directories
+     mkdir("/dev/block", 0755);
+     mkdir("/dev/input", 0755);
+@@ -175,11 +172,18 @@ int main(int argc, char** argv)
+         init_board.introduce_android();
+     }
+ 
+-    // Rename init ready for boot
+-    if (file_exists("/init.real") && !testBoard)
++    // Prepare init ready for boot
++    if (!testBoard)
+     {
++        mount("/", "/", NULL, MS_MGC_VAL | MS_REMOUNT, "");
+         unlink("/init");
+-        rename("/init.real", "/init");
++        if (link("/init.real", "/init") != 0) {
++            rename("/init.real", "/init");
++        }
++        chmod("/init", 0755);
++        chmod("/init.real", 0755);
++        chown("/init", 0, 0);
++        chown("/init.real", 0, 0);
+     }
+ 
+     // Finish init outputs
+@@ -192,7 +196,7 @@ int main(int argc, char** argv)
+       unlink(EXEC_KEYCHECK);
+       unlink(EXEC_TOYBOX);
+       unlink(SBIN_CPIO_RECOVERY);
+-      unlink(SBIN_INIT_SONY);
++      // unlink(SBIN_INIT_SONY);
+     }
+ 
+     // Unmount filesystems
+-- 
+2.53.0
+

@@ -1,7 +1,7 @@
 From 8dd2545fd3b5ef902da578cd8bb17ab74f677eed Mon Sep 17 00:00:00 2001
 From: mgiannetta <marcogiannetta96@gmail.com>
 Date: Mon, 2 Nov 2026 21:52:04 +0100
-Subject: [PATCH] frameworks/av: Restore Camera HAL1 and Video Recording
+Subject: [PATCH 2/2] frameworks/av: Restore Camera HAL1 and Video Recording
  support for legacy devices
 
 Change-Id: Ie9f91df54dfe0a82b5d5d6cf7915306447e46c7c

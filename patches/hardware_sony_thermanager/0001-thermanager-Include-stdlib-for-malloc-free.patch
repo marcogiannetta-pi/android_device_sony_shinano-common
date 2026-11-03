@@ -1,0 +1,25 @@
+From f994f7ba51dbf4a6ed16037027ac3a2aa461d922 Mon Sep 17 00:00:00 2001
+From: mgiannetta <marcogiannetta96@gmail.com>
+Date: Tue, 3 Nov 2026 17:20:41 +0100
+Subject: [PATCH] thermanager: include stdlib.h for malloc/free
+
+Change-Id: I22cccbe9f53c130b8b6f951dc5224355d8313c09
+---
+ src/libxml2parser.c | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/src/libxml2parser.c b/src/libxml2parser.c
+index e5885e4..19d08c9 100644
+--- a/src/libxml2parser.c
++++ b/src/libxml2parser.c
+@@ -1,6 +1,7 @@
+ #include <libxml/parser.h>
+ #include <libxml/tree.h>
+ #include <string.h>
++#include <stdlib.h>
+ 
+ #include "dom.h"
+ 
+-- 
+2.53.0
+

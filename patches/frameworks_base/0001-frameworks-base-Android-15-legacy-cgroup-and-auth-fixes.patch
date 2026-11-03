@@ -1,0 +1,97 @@
+diff --git a/core/jni/android_os_Debug.cpp b/core/jni/android_os_Debug.cpp
+index 3c2dccd45..93ee27c9c 100644
+--- a/core/jni/android_os_Debug.cpp
++++ b/core/jni/android_os_Debug.cpp
+@@ -782,9 +782,13 @@ static jboolean android_os_Debug_isVmapStack(JNIEnv *env, jobject clazz)
+     if (cfg_state == CONFIG_UNKNOWN) {
+         std::map<std::string, std::string> configs;
+         const status_t result = android::kernelconfigs::LoadKernelConfigs(&configs);
+-        CHECK(result == OK) << "Kernel configs could not be fetched. b/151092221";
+-        std::map<std::string, std::string>::const_iterator it = configs.find("CONFIG_VMAP_STACK");
+-        cfg_state = (it != configs.end() && it->second == "y") ? CONFIG_SET : CONFIG_UNSET;
++        if (result != OK) {
++            ALOGW("Kernel configs could not be fetched (%d), assuming CONFIG_VMAP_STACK is unset", result);
++            cfg_state = CONFIG_UNSET;
++        } else {
++            std::map<std::string, std::string>::const_iterator it = configs.find("CONFIG_VMAP_STACK");
++            cfg_state = (it != configs.end() && it->second == "y") ? CONFIG_SET : CONFIG_UNSET;
++        }
+     }
+     return cfg_state == CONFIG_SET;
+ }
+diff --git a/core/jni/fd_utils.cpp b/core/jni/fd_utils.cpp
+index 7fdece910..971552cbe 100644
+--- a/core/jni/fd_utils.cpp
++++ b/core/jni/fd_utils.cpp
+@@ -50,6 +50,7 @@ static const char* kPathAllowlist[] = {
+         "/dev/dri/renderD129", // Fixes b/31172436
+         "/dev/stune/foreground/tasks",
+         "/dev/blkio/tasks",
++        "/cache/init.log",
+         "/metadata/aconfig/maps/system.package.map",
+         "/metadata/aconfig/maps/system.flag.map",
+         "/metadata/aconfig/boot/system.val"
+diff --git a/services/core/java/com/android/server/am/ProcessList.java b/services/core/java/com/android/server/am/ProcessList.java
+index 70febcd63..b118ea77c 100644
+--- a/services/core/java/com/android/server/am/ProcessList.java
++++ b/services/core/java/com/android/server/am/ProcessList.java
+@@ -2593,14 +2593,9 @@ public final class ProcessList {
+                         // If we're not told to skip the process group creation, go create it.
+                         final int res = Process.createProcessGroup(uid, startResult.pid);
+                         if (res < 0) {
+-                            if (res == -OsConstants.ESRCH) {
+-                                Slog.e(ActivityManagerService.TAG,
+-                                        "Unable to create process group for "
+-                                        + app.processName + " (" + startResult.pid + ")");
+-                            } else {
+-                                throw new AssertionError("Unable to create process group for "
++                            Slog.e(ActivityManagerService.TAG,
++                                    "Unable to create process group for "
+                                     + app.processName + " (" + startResult.pid + ")");
+-                            }
+                         } else {
+                             app.mProcessGroupCreated = true;
+                         }
+diff --git a/services/core/java/com/android/server/cpu/CpuMonitorService.java b/services/core/java/com/android/server/cpu/CpuMonitorService.java
+index 2cadbc58d..0b9435edf 100644
+--- a/services/core/java/com/android/server/cpu/CpuMonitorService.java
++++ b/services/core/java/com/android/server/cpu/CpuMonitorService.java
+@@ -193,7 +193,7 @@ public final class CpuMonitorService extends SystemService {
+         // Initialize CPU info reader and perform the first read to make sure the CPU stats are
+         // readable without any issues.
+         if (!mCpuInfoReader.init() || mCpuInfoReader.readCpuInfos() == null) {
+-            Slogf.wtf(TAG, "Failed to initialize CPU info reader. This happens when the CPU "
++            Slogf.w(TAG, "Failed to initialize CPU info reader. This happens when the CPU "
+                     + "frequency stats are not available or the sysfs interface has changed in "
+                     + "the Kernel. Cannot monitor CPU without these stats. Terminating CPU monitor "
+                     + "service");
+diff --git a/services/core/java/com/android/server/locksettings/SyntheticPasswordManager.java b/services/core/java/com/android/server/locksettings/SyntheticPasswordManager.java
+index 47788f2e7..d708604dd 100644
+--- a/services/core/java/com/android/server/locksettings/SyntheticPasswordManager.java
++++ b/services/core/java/com/android/server/locksettings/SyntheticPasswordManager.java
+@@ -1647,13 +1647,18 @@ class SyntheticPasswordManager {
+         if (blob.mProtectorType != expectedProtectorType) {
+             throw new IllegalArgumentException("Invalid protector type: " + blob.mProtectorType);
+         }
+-        final byte[] spSecret;
+-        if (blob.mVersion == SYNTHETIC_PASSWORD_VERSION_V1) {
+-            spSecret = SyntheticPasswordCrypto.decryptBlobV1(getProtectorKeyAlias(protectorId),
+-                    blob.mContent, protectorSecret);
+-        } else {
+-            spSecret = decryptSpBlob(getProtectorKeyAlias(protectorId), blob.mContent,
+-                    protectorSecret);
++        byte[] spSecret = null;
++        try {
++            if (blob.mVersion == SYNTHETIC_PASSWORD_VERSION_V1) {
++                spSecret = SyntheticPasswordCrypto.decryptBlobV1(getProtectorKeyAlias(protectorId),
++                        blob.mContent, protectorSecret);
++            } else {
++                spSecret = decryptSpBlob(getProtectorKeyAlias(protectorId), blob.mContent,
++                        protectorSecret);
++            }
++        } catch (Exception e) {
++            Slog.e(TAG, "Exception while decrypting SP blob for user " + userId, e);
++            spSecret = null;
+         }
+         if (spSecret == null) {
+             Slog.e(TAG, "Fail to decrypt SP for user " + userId);

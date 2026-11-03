@@ -1,0 +1,48 @@
+diff --git a/luni/src/main/native/NetworkUtilities.cpp b/luni/src/main/native/NetworkUtilities.cpp
+index be03d93..cfc0de3 100644
+--- a/luni/src/main/native/NetworkUtilities.cpp
++++ b/luni/src/main/native/NetworkUtilities.cpp
+@@ -36,6 +36,11 @@
+ 
+ 
+ jobject sockaddrToInetAddress(JNIEnv* env, const sockaddr* sa, jint* port) {
++    if (sa == nullptr) {
++        ALOGW("sockaddrToInetAddress called with null sockaddr");
++        return NULL;
++    }
++
+     // Convert IPv4-mapped IPv6 addresses to IPv4 addresses.
+     // The RI states "Java will never return an IPv4-mapped address".
+     if (sa->sa_family == AF_INET6) {
+diff --git a/luni/src/main/native/libcore_io_Linux.cpp b/luni/src/main/native/libcore_io_Linux.cpp
+index 5a4de35..58fe6e1 100644
+--- a/luni/src/main/native/libcore_io_Linux.cpp
++++ b/luni/src/main/native/libcore_io_Linux.cpp
+@@ -1395,10 +1395,12 @@ static jobjectArray Linux_android_getaddrinfo(JNIEnv* env, jobject, jstring java
+     // Count results so we know how to size the output array.
+     int addressCount = 0;
+     for (addrinfo* ai = addressList; ai != NULL; ai = ai->ai_next) {
+-        if (ai->ai_family == AF_INET || ai->ai_family == AF_INET6) {
++        if ((ai->ai_family == AF_INET || ai->ai_family == AF_INET6) &&
++            ai->ai_addr != NULL && ai->ai_addr->sa_family == ai->ai_family) {
+             ++addressCount;
+         } else {
+-            ALOGE("android_getaddrinfo unexpected ai_family %i", ai->ai_family);
++            ALOGE("android_getaddrinfo unexpected or uninitialized address (ai_family %i, sa_family %i)",
++                  ai->ai_family, ai->ai_addr ? ai->ai_addr->sa_family : -1);
+         }
+     }
+     if (addressCount == 0) {
+@@ -1414,9 +1416,9 @@ static jobjectArray Linux_android_getaddrinfo(JNIEnv* env, jobject, jstring java
+     // Examine returned addresses one by one, save them in the output array.
+     int index = 0;
+     for (addrinfo* ai = addressList; ai != NULL; ai = ai->ai_next) {
+-        if (ai->ai_family != AF_INET && ai->ai_family != AF_INET6) {
+-            // Unknown address family. Skip this address.
+-            ALOGE("android_getaddrinfo unexpected ai_family %i", ai->ai_family);
++        if ((ai->ai_family != AF_INET && ai->ai_family != AF_INET6) ||
++            ai->ai_addr == NULL || ai->ai_addr->sa_family != ai->ai_family) {
++            // Unknown or uninitialized address family. Skip this address.
+             continue;
+         }
+ 

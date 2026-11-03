@@ -1,0 +1,27 @@
+diff --git a/src/gpu/ganesh/gl/GrGLCaps.cpp b/src/gpu/ganesh/gl/GrGLCaps.cpp
+index f8af2e3..a2be14d 100644
+--- a/src/gpu/ganesh/gl/GrGLCaps.cpp
++++ b/src/gpu/ganesh/gl/GrGLCaps.cpp
+@@ -1096,6 +1096,10 @@ void GrGLCaps::initGLSL(const GrGLContextInfo& ctxInfo, const GrGLInterface* gli
+             // At least one driver has been found that has this extension without the "GL_" prefix.
+             shaderCaps->fExternalTextureSupport = true;
+             shaderCaps->fExternalTextureExtensionString = "GL_OES_EGL_image_external_essl3";
++        } else {
++            // Legacy GLES 3.0 driver (e.g. Adreno 3xx) supporting GL_OES_EGL_image_external in ESSL 3.00
++            shaderCaps->fExternalTextureSupport = true;
++            shaderCaps->fExternalTextureExtensionString = "GL_OES_EGL_image_external";
+         }
+     }
+ 
+@@ -4480,7 +4484,10 @@ void GrGLCaps::applyDriverCorrectnessWorkarounds(const GrGLContextInfo& ctxInfo,
+         !shaderCaps->fExternalTextureSupport) { // i.e. Missing the _essl3 extension
+         shaderCaps->fExternalTextureSupport = true;
+         shaderCaps->fExternalTextureExtensionString = "GL_OES_EGL_image_external";
+-        shaderCaps->fSecondExternalTextureExtensionString = "GL_OES_EGL_image_external_essl3";
++        if (ctxInfo.hasExtension("GL_OES_EGL_image_external_essl3") ||
++            ctxInfo.hasExtension("OES_EGL_image_external_essl3")) {
++            shaderCaps->fSecondExternalTextureExtensionString = "GL_OES_EGL_image_external_essl3";
++        }
+     }
+ 
+ #ifdef SK_BUILD_FOR_IOS

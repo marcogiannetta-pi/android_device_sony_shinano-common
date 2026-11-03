@@ -1,0 +1,21 @@
+diff --git a/qcom/private/platform_app.te b/qcom/private/platform_app.te
+index 87bd5c6..c56a5de 100644
+--- a/qcom/private/platform_app.te
++++ b/qcom/private/platform_app.te
+@@ -1 +1,2 @@
+-hal_client_domain(platform_app, vendor_hal_soter)
++# hal_client_domain(platform_app, vendor_hal_soter)
++
+diff --git a/qcom/sepolicy.mk b/qcom/sepolicy.mk
+index a92ac8b..2ff113d 100644
+--- a/qcom/sepolicy.mk
++++ b/qcom/sepolicy.mk
+@@ -22,7 +22,7 @@ BOARD_VENDOR_SEPOLICY_DIRS += \
+     device/lineage/sepolicy/qcom/vendor
+ endif
+ 
+-ifeq (,$(filter msm8937 msm8953 msm8996 msm8998 sdm660 sdm710 sdm845, $(TARGET_BOARD_PLATFORM)))
++ifeq (,$(filter msm8974 msm8937 msm8953 msm8996 msm8998 sdm660 sdm710 sdm845, $(TARGET_BOARD_PLATFORM)))
+ BOARD_SEPOLICY_M4DEFS += \
+     display_vendor_data_file=vendor_display_vendor_data_file \
+     hal_gnss_qti=vendor_hal_gnss_qti \

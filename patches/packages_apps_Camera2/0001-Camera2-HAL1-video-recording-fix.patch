@@ -1,0 +1,196 @@
+diff --git a/src/com/android/camera/VideoModule.java b/src/com/android/camera/VideoModule.java
+index 68c68d6..00877ac 100644
+--- a/src/com/android/camera/VideoModule.java
++++ b/src/com/android/camera/VideoModule.java
+@@ -1521,11 +1521,17 @@ public class VideoModule extends CameraModule
+         mAppController.getCameraAppUI().animateBottomBarToFullSize(mShutterIconId);
+         if (!mPaused && mCameraDevice != null) {
+             setFocusParameters();
+-            mCameraDevice.lock();
+-            if (!ApiHelper.HAS_SURFACE_TEXTURE_RECORDING) {
++            try {
++                mCameraDevice.lock();
++            } catch (Exception e) {
++                Log.w(TAG, "Failed to lock camera after video recording", e);
++            }
++            try {
+                 stopPreview();
+-                // Switch back to use SurfaceTexture for preview.
++                // Switch back to clean SurfaceTexture preview.
+                 startPreview();
++            } catch (Exception e) {
++                Log.w(TAG, "Failed to restart preview after video recording", e);
+             }
+             // Update the parameters here because the parameters might have been altered
+             // by MediaRecorder.
+@@ -1638,17 +1644,30 @@ public class VideoModule extends CameraModule
+ 
+         Size previewSize = new Size(mDesiredPreviewWidth, mDesiredPreviewHeight);
+         mCameraSettings.setPreviewSize(previewSize.toPortabilitySize());
+-        // This is required for Samsung SGH-I337 and probably other Samsung S4 versions
+-        if (Build.BRAND.toLowerCase().contains("samsung")) {
++        if (mCameraCapabilities.getSupportedVideoSizes() != null
++                && !mCameraCapabilities.getSupportedVideoSizes().isEmpty()) {
+             mCameraSettings.setSetting("video-size",
+                     mProfile.videoFrameWidth + "x" + mProfile.videoFrameHeight);
+         }
+-        int[] fpsRange =
+-                CameraUtil.getMaxPreviewFpsRange(mCameraCapabilities.getSupportedPreviewFpsRange());
+-        if (fpsRange.length > 0) {
+-            mCameraSettings.setPreviewFpsRange(fpsRange[0], fpsRange[1]);
++        int targetFps = mProfile.videoFrameRate * 1000;
++        int[] selectedFpsRange = null;
++        for (int[] range : mCameraCapabilities.getSupportedPreviewFpsRange()) {
++            if (range[1] == targetFps) {
++                if (selectedFpsRange == null || range[0] > selectedFpsRange[0]) {
++                    selectedFpsRange = range;
++                }
++            }
++        }
++        if (selectedFpsRange != null) {
++            mCameraSettings.setPreviewFpsRange(selectedFpsRange[0], selectedFpsRange[1]);
+         } else {
+-            mCameraSettings.setPreviewFrameRate(mProfile.videoFrameRate);
++            int[] fpsRange =
++                    CameraUtil.getMaxPreviewFpsRange(mCameraCapabilities.getSupportedPreviewFpsRange());
++            if (fpsRange.length > 0) {
++                mCameraSettings.setPreviewFpsRange(fpsRange[0], fpsRange[1]);
++            } else {
++                mCameraSettings.setPreviewFrameRate(mProfile.videoFrameRate);
++            }
+         }
+ 
+         enableTorchMode(Keys.isCameraBackFacing(settingsManager, mAppController.getModuleScope()));
+diff --git a/src/com/android/camera/app/CameraAppUI.java b/src/com/android/camera/app/CameraAppUI.java
+index 94bb69f..d00068b 100644
+--- a/src/com/android/camera/app/CameraAppUI.java
++++ b/src/com/android/camera/app/CameraAppUI.java
+@@ -1448,6 +1448,7 @@ public class CameraAppUI implements ModeListView.ModeSwitchListener,
+                 mModeCoverState = COVER_WILL_HIDE_AT_NEXT_TEXTURE_UPDATE;
+             }
+         }
++        hideModeCover();
+         enableModeOptions();
+     }
+ 
+diff --git a/src/com/android/camera/one/config/OneCameraFeatureConfigCreator.java b/src/com/android/camera/one/config/OneCameraFeatureConfigCreator.java
+index dc7f900..d1b1df3 100644
+--- a/src/com/android/camera/one/config/OneCameraFeatureConfigCreator.java
++++ b/src/com/android/camera/one/config/OneCameraFeatureConfigCreator.java
+@@ -40,8 +40,8 @@ public class OneCameraFeatureConfigCreator {
+      */
+     public static OneCameraFeatureConfig createDefault(ContentResolver contentResolver,
+             MemoryManager memoryManager) {
+-        // Enable CaptureModule on all M devices.
+-        boolean useCaptureModule = true;
++        // Enable CaptureModule only on HAL3+ devices; use PhotoModule for HAL1
++        boolean useCaptureModule = false;
+         Log.i(TAG, "CaptureModule? " + useCaptureModule);
+ 
+         // HDR+ has multiple levels of support.
+diff --git a/src/com/android/camera/one/v2/Camera2OneCameraManagerImpl.java b/src/com/android/camera/one/v2/Camera2OneCameraManagerImpl.java
+index be5ddc9..8b4e98b 100644
+--- a/src/com/android/camera/one/v2/Camera2OneCameraManagerImpl.java
++++ b/src/com/android/camera/one/v2/Camera2OneCameraManagerImpl.java
+@@ -56,8 +56,17 @@ public class Camera2OneCameraManagerImpl extends CameraManager.AvailabilityCallb
+         CameraManager cameraManager;
+         try {
+             cameraManager = AndroidServices.instance().provideCameraManager();
+-        } catch (IllegalStateException ex) {
+-            Log.e(TAG, "camera2.CameraManager is not available.");
++            String[] cameraIds = cameraManager.getCameraIdList();
++            for (String id : cameraIds) {
++                CameraCharacteristics chars = cameraManager.getCameraCharacteristics(id);
++                Integer level = chars.get(CameraCharacteristics.INFO_SUPPORTED_HARDWARE_LEVEL);
++                if (level == null || level == CameraCharacteristics.INFO_SUPPORTED_HARDWARE_LEVEL_LEGACY) {
++                    Log.i(TAG, "Device " + id + " is LEGACY, falling back to Camera1 API");
++                    return Optional.absent();
++                }
++            }
++        } catch (Exception ex) {
++            Log.e(TAG, "camera2.CameraManager is not available.", ex);
+             return Optional.absent();
+         }
+         Camera2OneCameraManagerImpl hardwareManager =
+diff --git a/src/com/android/camera/one/v2/OneCameraCharacteristicsImpl.java b/src/com/android/camera/one/v2/OneCameraCharacteristicsImpl.java
+index 77e9a81..876b435 100644
+--- a/src/com/android/camera/one/v2/OneCameraCharacteristicsImpl.java
++++ b/src/com/android/camera/one/v2/OneCameraCharacteristicsImpl.java
+@@ -38,6 +38,7 @@ import com.android.camera.util.Size;
+ import com.google.common.primitives.Floats;
+ 
+ import java.util.ArrayList;
++import java.util.Collections;
+ import java.util.List;
+ 
+ /**
+@@ -165,6 +166,9 @@ public class OneCameraCharacteristicsImpl implements OneCameraCharacteristics {
+     public List<FaceDetectMode> getSupportedFaceDetectModes() {
+         int[] modes = mCameraCharacteristics.get(
+               CameraCharacteristics.STATISTICS_INFO_AVAILABLE_FACE_DETECT_MODES);
++        if (modes == null) {
++            return Collections.emptyList();
++        }
+ 
+         List<FaceDetectMode> oneModes = new ArrayList<>(modes.length);
+ 
+@@ -190,7 +194,11 @@ public class OneCameraCharacteristicsImpl implements OneCameraCharacteristics {
+ 
+     @Override
+     public List<Float> getAvailableFocalLengths() {
+-        return Floats.asList(mCameraCharacteristics.get(CameraCharacteristics.LENS_INFO_AVAILABLE_FOCAL_LENGTHS));
++        float[] focalLengths = mCameraCharacteristics.get(CameraCharacteristics.LENS_INFO_AVAILABLE_FOCAL_LENGTHS);
++        if (focalLengths == null) {
++            return Collections.emptyList();
++        }
++        return Floats.asList(focalLengths);
+     }
+ 
+     @Override
+@@ -202,7 +210,7 @@ public class OneCameraCharacteristicsImpl implements OneCameraCharacteristics {
+         }
+         Range<Integer> compensationRange =
+                 mCameraCharacteristics.get(CameraCharacteristics.CONTROL_AE_COMPENSATION_RANGE);
+-        return compensationRange.getLower() != 0 || compensationRange.getUpper() != 0;
++        return compensationRange != null && (compensationRange.getLower() != 0 || compensationRange.getUpper() != 0);
+     }
+ 
+     @Override
+@@ -212,7 +220,7 @@ public class OneCameraCharacteristicsImpl implements OneCameraCharacteristics {
+         }
+         Range<Integer> compensationRange =
+                 mCameraCharacteristics.get(CameraCharacteristics.CONTROL_AE_COMPENSATION_RANGE);
+-        return compensationRange.getLower();
++        return compensationRange != null ? compensationRange.getLower() : -1;
+     }
+ 
+     @Override
+@@ -222,7 +230,7 @@ public class OneCameraCharacteristicsImpl implements OneCameraCharacteristics {
+         }
+         Range<Integer> compensationRange =
+                 mCameraCharacteristics.get(CameraCharacteristics.CONTROL_AE_COMPENSATION_RANGE);
+-        return compensationRange.getUpper();
++        return compensationRange != null ? compensationRange.getUpper() : -1;
+     }
+ 
+     @Override
+@@ -232,6 +240,9 @@ public class OneCameraCharacteristicsImpl implements OneCameraCharacteristics {
+         }
+         Rational compensationStep = mCameraCharacteristics.get(
+                 CameraCharacteristics.CONTROL_AE_COMPENSATION_STEP);
++        if (compensationStep == null || compensationStep.getDenominator() == 0) {
++            return -1.0f;
++        }
+         return (float) compensationStep.getNumerator() / compensationStep.getDenominator();
+     }
+ 
+@@ -247,6 +258,9 @@ public class OneCameraCharacteristicsImpl implements OneCameraCharacteristics {
+     public boolean isContinuousPictureAutoFocusSupported() {
+         int[] availableAfModes =
+                 mCameraCharacteristics.get(CameraCharacteristics.CONTROL_AF_AVAILABLE_MODES);
++        if (availableAfModes == null) {
++            return false;
++        }
+         boolean continuousPictureAfModeAvailable = false;
+         for (int i = 0; i < availableAfModes.length; i++) {
+             if (availableAfModes[i] == CameraCharacteristics.CONTROL_AF_MODE_CONTINUOUS_PICTURE) {
