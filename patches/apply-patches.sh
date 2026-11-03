@@ -13,8 +13,10 @@ echo ""
 declare -A PATCH_MAP=(
     ["frameworks_av"]="frameworks/av"
     ["frameworks_native"]="frameworks/native"
+    ["frameworks_opt_telephony"]="frameworks/opt/telephony"
     ["hardware_broadcom_fm"]="hardware/broadcom/fm"
     ["hardware_interfaces"]="hardware/interfaces"
+    ["hardware_lineage_compat"]="hardware/lineage/compat"
     ["hardware_qcom-caf_msm8974_audio"]="hardware/qcom-caf/msm8974/audio"
     ["hardware_sony_thermanager"]="hardware/sony/thermanager"
     ["lineage-sdk"]="lineage-sdk"
@@ -25,6 +27,7 @@ declare -A PATCH_MAP=(
     ["packages_providers_ContactsProvider"]="packages/providers/ContactsProvider"
     ["packages_services_Mms"]="packages/services/Mms"
     ["system_core"]="system/core"
+    ["system_libhidl"]="system/libhidl"
     ["system_media"]="system/media"
     ["system_vold"]="system/vold"
 )

@@ -1,0 +1,39 @@
+From 72beee55a974f66f773563f1d137d2a5e9fde87b Mon Sep 17 00:00:00 2001
+From: mgiannetta <marcogiannetta96@gmail.com>
+Date: Tue, 3 Nov 2026 10:26:38 +0100
+Subject: [PATCH] libaudioclient: Add AudioSystem::setErrorCallback shim for
+ legacy RIL
+
+Change-Id: I98f3512b523553911271539b052144a5489c15bd
+---
+ libaudioclient/AudioTrack.cpp | 9 +++++++++
+ 1 file changed, 9 insertions(+)
+
+diff --git a/libaudioclient/AudioTrack.cpp b/libaudioclient/AudioTrack.cpp
+index e3a2ee9..57498d1 100644
+--- a/libaudioclient/AudioTrack.cpp
++++ b/libaudioclient/AudioTrack.cpp
+@@ -16,6 +16,7 @@
+ */
+ 
+ #include <media/AudioTrack.h>
++#include <media/AudioSystem.h>
+ 
+ namespace android {
+ 
+@@ -120,4 +121,12 @@ _ZN7android10AudioTrackC1E19audio_stream_type_tj14audio_format_t20audio_channel_
+ }
+ #endif
+ 
++extern "C" uintptr_t _ZN7android11AudioSystem16addErrorCallbackEPFviE(
++        android::audio_error_callback cb);
++
++extern "C" void _ZN7android11AudioSystem16setErrorCallbackEPFviE(
++        android::audio_error_callback cb) {
++    _ZN7android11AudioSystem16addErrorCallbackEPFviE(cb);
++}
++
+ }  // namespace android
+-- 
+2.53.0
+
