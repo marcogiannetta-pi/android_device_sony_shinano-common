@@ -37,6 +37,7 @@ declare -A PATCH_MAP=(
     ["system_libvintf"]="system/libvintf"
     ["system_media"]="system/media"
     ["system_netd"]="system/netd"
+    ["system_vold"]="system/vold"
 )
 
 for patch_dir in "${!PATCH_MAP[@]}"; do
