@@ -1,8 +1,8 @@
 diff --git a/server/Controllers.cpp b/server/Controllers.cpp
-index ea34897..1058782 100644
+index 48d0c50..6f72922 100644
 --- a/server/Controllers.cpp
 +++ b/server/Controllers.cpp
-@@ -322,10 +322,8 @@ void Controllers::init() {
+@@ -323,10 +323,8 @@ void Controllers::init() {
          gLog.error("Failed to initialize BandwidthController (%s)", strerror(-ret));
          // A failure to init almost definitely means that iptables failed to load
          // our static ruleset, which then basically means network accounting will not work.
@@ -16,7 +16,7 @@ index ea34897..1058782 100644
      gLog.info("Enabling bandwidth control: %" PRId64 "us", s.getTimeAndResetUs());
  
 diff --git a/server/main.cpp b/server/main.cpp
-index b0c5406..6e5a2a2 100644
+index d27fd76..20d2256 100644
 --- a/server/main.cpp
 +++ b/server/main.cpp
 @@ -23,6 +23,7 @@
@@ -60,10 +60,10 @@ index b0c5406..6e5a2a2 100644
  int main() {
 +    logNetd("netd main started");
      Stopwatch s;
-     gLog.info("netd 1.0 starting");
+     gLog.info("netd starting");
  
-@@ -137,84 +157,95 @@ int main() {
-         gLog.info("setCloseOnExec(%s)", sock);
+@@ -134,84 +154,95 @@ int main() {
+         setCloseOnExec(sock);
      }
  
 +    logNetd("step 1: cgroup2 & bpf");
@@ -185,7 +185,7 @@ index b0c5406..6e5a2a2 100644
      android::hardware::configureRpcThreadpool(2, true /* callerWillJoin */);
      IPCThreadState::self()->disableBackgroundScheduling(true);
  
-@@ -229,11 +260,13 @@ int main() {
+@@ -226,11 +257,13 @@ int main() {
  
      gLog.info("Registering NetdHwService: %" PRId64 "us", subTime.getTimeAndResetUs());
      gLog.info("Netd started in %" PRId64 "us", s.timeTakenUs());
@@ -200,10 +200,10 @@ index b0c5406..6e5a2a2 100644
      exit(0);
  }
 diff --git a/server/netd.rc b/server/netd.rc
-index d8250c2..4c3ae63 100644
+index d564c0e..e6ef486 100644
 --- a/server/netd.rc
 +++ b/server/netd.rc
-@@ -6,8 +6,8 @@ service netd /system/bin/netd
+@@ -8,8 +8,8 @@ service netd /system/bin/netd
      socket dnsproxyd stream 0660 root inet
      socket mdns stream 0660 root system
      socket fwmarkd stream 0660 root inet

@@ -39,8 +39,7 @@ if [ "x$CREDMGRCNT" == "x0" ]; then
 	F_ERR $? "chown $CREDFOLDER"
 	chmod 770 $CREDFOLDER >> $LOG 2>&1
 	F_ERR $? "chmod 770"
-	chcon u:object_r:credmgrd_data_file:s0 $CREDFOLDER >> $LOG 2>&1
-	F_ERR $? "chcon $CREDFOLDER"
+	chcon u:object_r:credmgrd_data_file:s0 $CREDFOLDER >> $LOG 2>&1 || true
 	echo "CREDINIT: cp initial file" >> $LOG 2>&1
 	cp -v /vendor/CredentialManagerData /cache/CredentialManagerData >> $LOG 2>&1
 	F_ERR $? "copy CredentialManagerData"

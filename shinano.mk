@@ -53,6 +53,7 @@ PRODUCT_COPY_FILES += \
 # Camera
 PRODUCT_PACKAGES += \
     Camera2 \
+    libcamera_client.vendor \
     libshim_camera \
     libshim_sensor \
     urandom_init
@@ -77,8 +78,8 @@ PRODUCT_COPY_FILES += \
     $(COMMON_PATH)/configs/keylayout/msm8974-taiko-mtp-snd-card_Button_Jack.kl:$(TARGET_COPY_OUT_VENDOR)/usr/keylayout/msm8974-taiko-mtp-snd-card_Button_Jack.kl
 
 # Lineage Hardware
-PRODUCT_PACKAGES += \
-    vendor.lineage.touch@1.0-service.shinano
+# PRODUCT_PACKAGES += \
+#     vendor.lineage.touch@1.0-service.shinano
 
 # MAC address - BT and Wi-Fi
 PRODUCT_PACKAGES += \

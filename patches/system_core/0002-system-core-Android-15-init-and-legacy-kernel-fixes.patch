@@ -1,5 +1,5 @@
 diff --git a/init/block_dev_initializer.cpp b/init/block_dev_initializer.cpp
-index deb68e9..1b6d799 100644
+index 70ca0e4..0f191a5 100644
 --- a/init/block_dev_initializer.cpp
 +++ b/init/block_dev_initializer.cpp
 @@ -46,6 +46,9 @@ BlockDevInitializer::BlockDevInitializer() : uevent_listener_(16 * 1024 * 1024)
@@ -12,7 +12,7 @@ index deb68e9..1b6d799 100644
      bool uuid_check_done = false;
  
      auto boot_part_callback = [&, this](const Uevent& uevent) -> ListenerAction {
-@@ -154,9 +157,7 @@ ListenerAction BlockDevInitializer::HandleUevent(const Uevent& uevent,
+@@ -165,9 +168,7 @@ ListenerAction BlockDevInitializer::HandleUevent(const Uevent& uevent,
      // or possibly not all the partitions that we need to wait for are on the
      // specified boot device. Thus, only require partitions to be on the boot
      // device in "strict" mode, which should be used on newer systems.
@@ -23,7 +23,7 @@ index deb68e9..1b6d799 100644
  
      device_handler_->HandleUevent(uevent);
      return devices->empty() ? ListenerAction::kStop : ListenerAction::kContinue;
-@@ -182,6 +183,17 @@ bool BlockDevInitializer::InitDevices(std::set<std::string> devices) {
+@@ -193,6 +194,17 @@ bool BlockDevInitializer::InitDevices(std::set<std::string> devices) {
      auto uevent_callback = [&, this](const Uevent& uevent) -> ListenerAction {
          return HandleUevent(uevent, &devices);
      };
@@ -42,7 +42,7 @@ index deb68e9..1b6d799 100644
  
      // UeventCallback() will remove found partitions from |devices|. So if it
 diff --git a/init/builtins.cpp b/init/builtins.cpp
-index c3e9096..594dbe6 100644
+index 4cf2b38..8e6c11a 100644
 --- a/init/builtins.cpp
 +++ b/init/builtins.cpp
 @@ -577,7 +577,8 @@ static void import_late(const std::vector<std::string>& rc_paths) {
@@ -56,10 +56,10 @@ index c3e9096..594dbe6 100644
          ActionManager::GetInstance().QueueEventTrigger("nonencrypted");
          return {};
 diff --git a/init/devices.cpp b/init/devices.cpp
-index aaf4fca..38d1ec3 100644
+index 8cd1ddc..5f47f6f 100644
 --- a/init/devices.cpp
 +++ b/init/devices.cpp
-@@ -192,6 +192,13 @@ void SysfsPermissions::SetPermissions(const std::string& path) const {
+@@ -191,6 +191,13 @@ void SysfsPermissions::SetPermissions(const std::string& path) const {
  BlockDeviceInfo DeviceHandler::GetBlockDeviceInfo(const std::string& uevent_path) const {
      BlockDeviceInfo info;
  
@@ -74,7 +74,7 @@ index aaf4fca..38d1ec3 100644
          // Only use the more specific "MMC" / "NVME" / "SCSI" match if a
          // partition UUID was passed.
 diff --git a/init/first_stage_init.cpp b/init/first_stage_init.cpp
-index e06a645..a04b5f1 100644
+index 3070fae..855f2f4 100644
 --- a/init/first_stage_init.cpp
 +++ b/init/first_stage_init.cpp
 @@ -330,7 +330,32 @@ static std::unique_ptr<FirstStageMount> CreateFirstStageMount(const std::string&
@@ -119,7 +119,7 @@ index e06a645..a04b5f1 100644
  
      // Clear the umask.
      umask(0);
-@@ -367,6 +392,7 @@ int FirstStageMain(int argc, char** argv) {
+@@ -365,6 +390,7 @@ int FirstStageMain(int argc, char** argv) {
      gid_t groups[] = {AID_READPROC};
      CHECKCALL(setgroups(arraysize(groups), groups));
      CHECKCALL(mount("sysfs", "/sys", "sysfs", 0, NULL));
@@ -127,7 +127,7 @@ index e06a645..a04b5f1 100644
      CHECKCALL(mount("selinuxfs", "/sys/fs/selinux", "selinuxfs", 0, NULL));
  
      CHECKCALL(mknod("/dev/kmsg", S_IFCHR | 0600, makedev(1, 11)));
-@@ -420,10 +446,12 @@ int FirstStageMain(int argc, char** argv) {
+@@ -418,10 +444,12 @@ int FirstStageMain(int argc, char** argv) {
          for (const auto& [error_string, error_errno] : errors) {
              LOG(ERROR) << error_string << " " << strerror(error_errno);
          }
@@ -140,7 +140,7 @@ index e06a645..a04b5f1 100644
  
      auto old_root_dir = std::unique_ptr<DIR, decltype(&closedir)>{opendir("/"), closedir};
      if (!old_root_dir) {
-@@ -529,14 +557,17 @@ int FirstStageMain(int argc, char** argv) {
+@@ -527,14 +555,17 @@ int FirstStageMain(int argc, char** argv) {
              fsm = CreateFirstStageMount(cmdline);
          }
          if (!fsm) {
@@ -158,10 +158,10 @@ index e06a645..a04b5f1 100644
              LOG(FATAL) << "Failed to mount required partitions early ...";
          }
      }
-@@ -562,10 +593,13 @@ int FirstStageMain(int argc, char** argv) {
-     dup2(fd, STDOUT_FILENO);
-     dup2(fd, STDERR_FILENO);
-     close(fd);
+@@ -572,10 +603,13 @@ int FirstStageMain(int argc, char** argv) {
+     // are inherited beyond exec.
+     setenv("HWASAN_OPTIONS", STRINGIFY(HWASAN_OPTIONS), true);
+ #endif
 +
 +    SetDebugLed(0, 255, 0);  // Solid GREEN: FirstStageMount success! Executing /system/bin/init selinux_setup!
 +    usleep(1500000);
@@ -175,10 +175,18 @@ index e06a645..a04b5f1 100644
  
      return 1;
 diff --git a/init/first_stage_mount.cpp b/init/first_stage_mount.cpp
-index bb5de21..f828e5c 100644
+index 0148a5a..2f14613 100644
 --- a/init/first_stage_mount.cpp
 +++ b/init/first_stage_mount.cpp
-@@ -282,6 +282,20 @@ bool FirstStageMountVBootV2::DoFirstStageMount() {
+@@ -128,6 +128,7 @@ class FirstStageMountVBootV2 : public FirstStageMount {
+ 
+     std::vector<std::string> vbmeta_partitions_;
+     AvbUniquePtr avb_handle_;
++    bool need_dm_verity_ = false;
+ };
+ 
+ // Static Functions
+@@ -274,6 +275,20 @@ bool FirstStageMountVBootV2::DoFirstStageMount() {
      return true;
  }
  
@@ -199,7 +207,7 @@ index bb5de21..f828e5c 100644
  // TODO: should this be in a library in packages/modules/Virtualization first_stage_init links?
  static bool IsMicrodroidStrictBoot() {
      return access("/proc/device-tree/chosen/avf,strict-boot", F_OK) == 0;
-@@ -289,6 +303,7 @@ static bool IsMicrodroidStrictBoot() {
+@@ -281,6 +296,7 @@ static bool IsMicrodroidStrictBoot() {
  
  bool FirstStageMountVBootV2::InitDevices() {
      if (!block_dev_init_.InitBootDevicesFromPartUuid()) {
@@ -207,7 +215,7 @@ index bb5de21..f828e5c 100644
          return false;
      }
  
-@@ -296,6 +311,7 @@ bool FirstStageMountVBootV2::InitDevices() {
+@@ -288,6 +304,7 @@ bool FirstStageMountVBootV2::InitDevices() {
      GetSuperDeviceName(&devices);
  
      if (!GetDmVerityDevices(&devices)) {
@@ -215,7 +223,7 @@ index bb5de21..f828e5c 100644
          return false;
      }
      if (!InitRequiredDevices(std::move(devices))) {
-@@ -340,13 +356,18 @@ void FirstStageMountVBootV2::GetSuperDeviceName(std::set<std::string>* devices)
+@@ -337,13 +354,18 @@ void FirstStageMountVBootV2::GetSuperDeviceName(std::set<std::string>* devices)
  // Found partitions will then be removed from it for the subsequent member
  // function to check which devices are NOT created.
  bool FirstStageMountVBootV2::InitRequiredDevices(std::set<std::string> devices) {
@@ -236,11 +244,37 @@ index bb5de21..f828e5c 100644
  }
  
  bool FirstStageMountVBootV2::InitDmLinearBackingDevices(
+@@ -766,14 +788,14 @@ FirstStageMountVBootV2::FirstStageMountVBootV2(Fstab fstab)
+ }
+ 
+ bool FirstStageMountVBootV2::GetDmVerityDevices(std::set<std::string>* devices) {
+-    bool need_dm_verity = false;
++    need_dm_verity_ = false;
+ 
+     std::set<std::string> logical_partitions;
+ 
+     // fstab_rec->blk_device has A/B suffix.
+     for (const auto& fstab_entry : fstab_) {
+         if (fstab_entry.fs_mgr_flags.avb) {
+-            need_dm_verity = true;
++            need_dm_verity_ = true;
+         }
+         // Skip pseudo filesystems.
+         if (fstab_entry.fs_type == "overlay") {
+@@ -789,7 +811,7 @@ bool FirstStageMountVBootV2::GetDmVerityDevices(std::set<std::string>* devices)
+ 
+     // Any partitions needed for verifying the partitions used in first stage mount, e.g. vbmeta
+     // must be provided as vbmeta_partitions.
+-    if (need_dm_verity) {
++    if (need_dm_verity_) {
+         if (vbmeta_partitions_.empty()) {
+             LOG(ERROR) << "Missing vbmeta partitions";
+             return false;
 diff --git a/init/init.cpp b/init/init.cpp
-index 6eceed8..b7abe3b 100644
+index 7de53f9..0f52c2b 100644
 --- a/init/init.cpp
 +++ b/init/init.cpp
-@@ -921,6 +921,11 @@ static Result<void> ConnectEarlyStageSnapuserdAction(const BuiltinArguments& arg
+@@ -1047,6 +1047,11 @@ static void StartSecondStageBootMonitor(int timeout_sec) {
  }
  
  int SecondStageMain(int argc, char** argv) {
@@ -252,7 +286,7 @@ index 6eceed8..b7abe3b 100644
      if (REBOOT_BOOTLOADER_ON_PANIC) {
          InstallRebootSignalHandlers();
      }
-@@ -986,6 +991,10 @@ int SecondStageMain(int argc, char** argv) {
+@@ -1112,6 +1117,10 @@ int SecondStageMain(int argc, char** argv) {
      }
  
      PropertyInit();
@@ -263,7 +297,7 @@ index 6eceed8..b7abe3b 100644
  
      // Umount second stage resources after property service has read the .prop files.
      UmountSecondStageRes();
-@@ -1016,6 +1025,11 @@ int SecondStageMain(int argc, char** argv) {
+@@ -1142,6 +1151,11 @@ int SecondStageMain(int argc, char** argv) {
      InstallInitNotifier(&epoll);
      StartPropertyService(&property_fd);
  
@@ -272,10 +306,10 @@ index 6eceed8..b7abe3b 100644
 +    android::base::WriteStringToFile("255", "/sys/class/leds/led:rgb_green/brightness");
 +    android::base::WriteStringToFile("255", "/sys/class/leds/led:rgb_blue/brightness");
 +
-     // Make the time that init stages started available for bootstat to log.
-     RecordStageBoottimes(start_time);
- 
-@@ -1038,6 +1052,11 @@ int SecondStageMain(int argc, char** argv) {
+     // Initialize extra devices required during second stage init.
+     // This may spawn threads for background work. Hence, this should be after
+     // InstallSignalFdHandler() which needs to be called before spawning any threads.
+@@ -1177,6 +1191,11 @@ int SecondStageMain(int argc, char** argv) {
          PLOG(FATAL) << "SetupMountNamespaces failed";
      }
  
@@ -287,7 +321,7 @@ index 6eceed8..b7abe3b 100644
      InitializeSubcontext();
  
      ActionManager& am = ActionManager::GetInstance();
-@@ -1045,6 +1064,11 @@ int SecondStageMain(int argc, char** argv) {
+@@ -1184,6 +1203,11 @@ int SecondStageMain(int argc, char** argv) {
  
      LoadBootScripts(am, sm);
  
@@ -299,7 +333,7 @@ index 6eceed8..b7abe3b 100644
      // Turning this on and letting the INFO logging be discarded adds 0.2s to
      // Nexus 9 boot time, so it's disabled by default.
      if (false) DumpState();
-@@ -1098,6 +1122,12 @@ int SecondStageMain(int argc, char** argv) {
+@@ -1249,6 +1273,12 @@ int SecondStageMain(int argc, char** argv) {
  
      // Restore prio before main loop
      setpriority(PRIO_PROCESS, 0, 0);
@@ -326,11 +360,26 @@ index b01a3ee..6a285ab 100644
  
  #if __has_feature(address_sanitizer)
  #include <sanitizer/asan_interface.h>
+diff --git a/init/property_service.cpp b/init/property_service.cpp
+index 3c78e76..a9927bb 100644
+--- a/init/property_service.cpp
++++ b/init/property_service.cpp
+@@ -162,6 +162,10 @@ bool CanReadProperty(const std::string& source_context, const std::string& name)
+ 
+ static bool CheckMacPerms(const std::string& name, const char* target_context,
+                           const char* source_context, const ucred& cr) {
++    if (!IsEnforcing()) {
++        return true;
++    }
++
+     if (!target_context || !source_context) {
+         return false;
+     }
 diff --git a/init/reboot.cpp b/init/reboot.cpp
-index 6251dbd..7c183c9 100644
+index 559282e..7b68774 100644
 --- a/init/reboot.cpp
 +++ b/init/reboot.cpp
-@@ -824,6 +824,13 @@ static bool CommandIsPresent(bootloader_message* boot) {
+@@ -1080,6 +1080,13 @@ void HandleShutdownRequestedMessage(const std::string& command) {
  }
  
  void HandlePowerctlMessage(const std::string& command) {
@@ -345,7 +394,7 @@ index 6251dbd..7c183c9 100644
      std::vector<std::string> cmd_params = Split(command, ",");
      std::string reboot_target = "";
 diff --git a/init/reboot_utils.cpp b/init/reboot_utils.cpp
-index 547b186..5da4db0 100644
+index 85a707b..a3dd088 100644
 --- a/init/reboot_utils.cpp
 +++ b/init/reboot_utils.cpp
 @@ -15,8 +15,11 @@
@@ -476,10 +525,10 @@ index 547b186..5da4db0 100644
  }
  
 diff --git a/init/selinux.cpp b/init/selinux.cpp
-index 6316b4d..e43ee67 100644
+index 93f6312..83633e8 100644
 --- a/init/selinux.cpp
 +++ b/init/selinux.cpp
-@@ -95,7 +95,7 @@ namespace {
+@@ -99,7 +99,7 @@ namespace {
  
  enum EnforcingStatus { SELINUX_PERMISSIVE, SELINUX_ENFORCING };
  
@@ -488,9 +537,12 @@ index 6316b4d..e43ee67 100644
      std::string value;
      if (android::fs_mgr::GetKernelCmdline("androidboot.selinux", &value) && value == "permissive") {
          return SELINUX_PERMISSIVE;
-@@ -107,10 +107,7 @@ EnforcingStatus StatusFromProperty() {
+@@ -110,13 +110,14 @@ EnforcingStatus StatusFromProperty() {
+     return SELINUX_ENFORCING;
  }
  
++}  // namespace
++
  bool IsEnforcing() {
 -    if (ALLOW_PERMISSIVE_SELINUX) {
 -        return StatusFromProperty() == SELINUX_ENFORCING;
@@ -499,8 +551,12 @@ index 6316b4d..e43ee67 100644
 +    return false; // Force permissive for bringup
  }
  
++namespace {
++
  bool ReadFirstLine(const char* file, std::string* line) {
-@@ -412,10 +409,18 @@ void ReadPolicy(std::string* policy) {
+     line->clear();
+ 
+@@ -416,10 +417,18 @@ void ReadPolicy(std::string* policy) {
      bool ok = IsSplitPolicyDevice() ? OpenSplitPolicy(&policy_file)
                                      : OpenMonolithicPolicy(&policy_file);
      if (!ok) {
@@ -519,7 +575,7 @@ index 6316b4d..e43ee67 100644
          PLOG(FATAL) << "Failed to read policy file: " << policy_file.path;
      }
  }
-@@ -425,8 +430,12 @@ void SelinuxSetEnforcement() {
+@@ -429,8 +438,12 @@ void SelinuxSetEnforcement() {
      bool is_enforcing = IsEnforcing();
      if (kernel_enforcing != is_enforcing) {
          if (security_setenforce(is_enforcing)) {
@@ -534,7 +590,7 @@ index 6316b4d..e43ee67 100644
          }
      }
  }
-@@ -544,6 +553,10 @@ int SelinuxGetVendorAndroidVersion() {
+@@ -552,6 +565,10 @@ int SelinuxGetVendorAndroidVersion() {
  
          std::string version;
          if (!GetVendorMappingVersion(&version)) {
@@ -545,7 +601,7 @@ index 6316b4d..e43ee67 100644
              LOG(FATAL) << "Could not read vendor SELinux version";
          }
  
-@@ -634,6 +647,10 @@ static void LoadSelinuxPolicy(std::string& policy) {
+@@ -643,6 +660,10 @@ static void LoadSelinuxPolicy(std::string& policy) {
  
      set_selinuxmnt("/sys/fs/selinux");
      if (security_load_policy(policy.data(), policy.size()) < 0) {
@@ -556,9 +612,9 @@ index 6316b4d..e43ee67 100644
          PLOG(FATAL) << "SELinux:  Could not load policy";
      }
  }
-@@ -698,10 +715,19 @@ void LoadSelinuxPolicyAndroid() {
-     }
- }
+@@ -777,10 +798,19 @@ bool EarlySetupOverlays() {
+ void SetupOverlays() {}
+ #endif
  
 +static void SetSelinuxLed(int r, int g, int b) {
 +    android::base::WriteStringToFile(std::to_string(r), "/sys/class/leds/led:rgb_red/brightness");
@@ -576,17 +632,17 @@ index 6316b4d..e43ee67 100644
      if (REBOOT_BOOTLOADER_ON_PANIC) {
          InstallRebootSignalHandlers();
      }
-@@ -710,6 +736,9 @@ int SetupSelinux(char** argv) {
+@@ -789,6 +819,9 @@ int SetupSelinux(char** argv) {
  
      SelinuxSetupKernelLogging();
  
 +    SetSelinuxLed(0, 255, 255); // Cyan: Loading policy...
 +    usleep(1000000);
 +
-     // TODO(b/287206497): refactor into different headers to only include what we need.
-     if (IsMicrodroid()) {
-         LoadSelinuxPolicyMicrodroid();
-@@ -717,6 +746,9 @@ int SetupSelinux(char** argv) {
+     // Test to see if we should use overlays, and if so remount tmpfs before selinux will block
+     bool use_overlays = EarlySetupOverlays();
+ 
+@@ -799,6 +832,9 @@ int SetupSelinux(char** argv) {
          LoadSelinuxPolicyAndroid();
      }
  
@@ -596,7 +652,7 @@ index 6316b4d..e43ee67 100644
      SelinuxSetEnforcement();
  
      if (IsMicrodroid() && android::virtualization::IsOpenDiceChangesFlagEnabled()) {
-@@ -733,17 +765,33 @@ int SetupSelinux(char** argv) {
+@@ -815,9 +851,16 @@ int SetupSelinux(char** argv) {
      // but other file systems do.  In particular, this is needed for ramdisks such as the
      // recovery image for A/B devices.
      if (selinux_android_restorecon("/system/bin/init", 0) == -1) {
@@ -613,7 +669,8 @@ index 6316b4d..e43ee67 100644
 +
      setenv(kEnvSelinuxStartedAt, std::to_string(start_time.time_since_epoch().count()).c_str(), 1);
  
-     const char* path = "/system/bin/init";
+     // SetupOverlays does not return if overlays exist, instead it execs overlay_remounter
+@@ -828,8 +871,17 @@ int SetupSelinux(char** argv) {
      const char* args[] = {path, "second_stage", nullptr};
      execv(path, const_cast<char**>(args));
  
@@ -633,11 +690,24 @@ index 6316b4d..e43ee67 100644
      PLOG(FATAL) << "execv(\"" << path << "\") failed";
  
      return 1;
+diff --git a/init/selinux.h b/init/selinux.h
+index 1a41bfd..ec796c7 100644
+--- a/init/selinux.h
++++ b/init/selinux.h
+@@ -34,6 +34,8 @@ void SelinuxSetupKernelLogging();
+ // Used for version checks such as whether or not vendor_init should be used.
+ int SelinuxGetVendorAndroidVersion();
+ 
++bool IsEnforcing();
++
+ static constexpr char kEnvSelinuxStartedAt[] = "SELINUX_STARTED_AT";
+ 
+ }  // namespace init
 diff --git a/init/service.cpp b/init/service.cpp
-index 102423a..a2600d8 100644
+index dbae8a7..2d2b12e 100644
 --- a/init/service.cpp
 +++ b/init/service.cpp
-@@ -719,12 +719,15 @@ Result<void> Service::Start() {
+@@ -739,12 +739,15 @@ Result<void> Service::Start() {
                           limit_percent_ != -1 || !limit_property_.empty();
          errno = -createProcessGroup(uid(), pid_, use_memcg);
          if (errno != 0) {
@@ -654,10 +724,10 @@ index 102423a..a2600d8 100644
  
          // When the blkio controller is mounted in the v1 hierarchy, NormalIoPriority is
 diff --git a/init/uevent_listener.cpp b/init/uevent_listener.cpp
-index d329c17..7c7c22c 100644
+index a7ecd43..0e55045 100644
 --- a/init/uevent_listener.cpp
 +++ b/init/uevent_listener.cpp
-@@ -152,7 +152,8 @@ ListenerAction UeventListener::RegenerateUeventsForDir(DIR* d,
+@@ -155,7 +155,8 @@ ListenerAction UeventListener::RegenerateUeventsForDir(DIR* d,
  
      dirent* de;
      while ((de = readdir(d)) != nullptr) {
@@ -668,7 +738,7 @@ index d329c17..7c7c22c 100644
          fd = openat(dfd, de->d_name, O_RDONLY | O_DIRECTORY | O_CLOEXEC);
          if (fd < 0) continue;
 diff --git a/init/util.cpp b/init/util.cpp
-index 375e905..d7cd906 100644
+index c9d20db..9c2c7d7 100644
 --- a/init/util.cpp
 +++ b/init/util.cpp
 @@ -26,6 +26,9 @@
@@ -681,7 +751,7 @@ index 375e905..d7cd906 100644
  #include <sys/un.h>
  #include <sys/wait.h>
  #include <time.h>
-@@ -663,9 +666,31 @@ void SetStdioToDevNull(char** argv) {
+@@ -664,9 +667,31 @@ void SetStdioToDevNull(char** argv) {
      if (fd > STDERR_FILENO) close(fd);
  }
  
@@ -714,38 +784,31 @@ index 375e905..d7cd906 100644
  }
  
  bool IsRecoveryMode() {
-diff --git a/libcutils/iosched_policy.cpp b/libcutils/iosched_policy.cpp
-index f7c724d..2cb0a63 100644
---- a/libcutils/iosched_policy.cpp
-+++ b/libcutils/iosched_policy.cpp
-@@ -15,6 +15,7 @@
- */
+diff --git a/libprocessgroup/processgroup.cpp b/libprocessgroup/processgroup.cpp
+index cea22b7..25a4bcb 100644
+--- a/libprocessgroup/processgroup.cpp
++++ b/libprocessgroup/processgroup.cpp
+@@ -693,7 +693,8 @@ static int createProcessGroupInternal(uid_t uid, pid_t initialPid, std::string c
+     int ret = 0;
  
- #include <cutils/iosched_policy.h>
-+#include <processgroup/sched_policy.h>
+     if (stat(cgroup.c_str(), &cgroup_stat) < 0) {
+-        PLOG(ERROR) << "Failed to get stats for " << cgroup;
++        PLOG(WARNING) << "Failed to get stats for " << cgroup << ", ignoring on legacy kernel";
++        return 0;
+     } else {
+         cgroup_mode = cgroup_stat.st_mode;
+         cgroup_uid = cgroup_stat.st_uid;
+@@ -701,8 +702,8 @@ static int createProcessGroupInternal(uid_t uid, pid_t initialPid, std::string c
+     }
  
- #include <errno.h>
- #include <fcntl.h>
-@@ -31,6 +32,19 @@
- #define __android_unused __attribute__((__unused__))
- #endif
- 
-+extern "C" __attribute__((weak)) int set_sched_policy(int, SchedPolicy) {
-+    return 0;
-+}
-+
-+extern "C" __attribute__((weak)) int get_sched_policy(int, SchedPolicy* policy) {
-+    if (policy) *policy = SP_SYSTEM_DEFAULT;
-+    return 0;
-+}
-+
-+extern "C" __attribute__((weak)) int set_cpuset_policy(int, SchedPolicy) {
-+    return 0;
-+}
-+
- int android_set_ioprio(int pid __android_unused, IoSchedClass clazz __android_unused, int ioprio __android_unused) {
- #if defined(__ANDROID__)
-     if (syscall(SYS_ioprio_set, IOPRIO_WHO_PROCESS, pid, ioprio | (clazz << IOPRIO_CLASS_SHIFT))) {
+     if (!MkdirAndChown(uid_path, cgroup_mode, cgroup_uid, cgroup_gid)) {
+-        PLOG(ERROR) << "Failed to make and chown " << uid_path;
+-        return -errno;
++        PLOG(WARNING) << "Failed to make and chown " << uid_path << ", ignoring on legacy kernel";
++        return 0;
+     }
+     if (activate_controllers) {
+         if (!CgroupMap::GetInstance().ActivateControllers(uid_path)) {
 diff --git a/libsystem/include/system/camera.h b/libsystem/include/system/camera.h
 index 2ca90c3..8fe7a9f 100644
 --- a/libsystem/include/system/camera.h
@@ -799,10 +862,10 @@ index 2ca90c3..8fe7a9f 100644
   * The metadata of the frame data.
   */
 diff --git a/rootdir/init.rc b/rootdir/init.rc
-index 0cc1297..2be879c 100644
+index 92dcdd0..62adcc8 100644
 --- a/rootdir/init.rc
 +++ b/rootdir/init.rc
-@@ -1262,6 +1262,9 @@ on boot
+@@ -1285,6 +1285,9 @@ on boot
  
      class_start core
  

@@ -1,8 +1,8 @@
 diff --git a/libs/binder/ProcessState.cpp b/libs/binder/ProcessState.cpp
-index 5e7f151..7ef5c4f 100644
+index f7d5347..8e82933 100644
 --- a/libs/binder/ProcessState.cpp
 +++ b/libs/binder/ProcessState.cpp
-@@ -439,8 +439,10 @@ void ProcessState::spawnPooledThread(bool isMain)
+@@ -449,8 +449,10 @@ void ProcessState::spawnPooledThread(bool isMain)
  }
  
  status_t ProcessState::setThreadPoolMaxThreadCount(size_t maxThreads) {
@@ -32,10 +32,10 @@ index f3241c9..d93a4da 100644
      for (const std::string& requiredConfig : configs) {
          const auto configIt = kernelConfigs.find(requiredConfig);
 diff --git a/libs/renderengine/skia/SkiaRenderEngine.cpp b/libs/renderengine/skia/SkiaRenderEngine.cpp
-index dc7a408..7c86ae4 100644
+index daa0ecc..ee6c2f0 100644
 --- a/libs/renderengine/skia/SkiaRenderEngine.cpp
 +++ b/libs/renderengine/skia/SkiaRenderEngine.cpp
-@@ -1041,6 +1041,10 @@ void SkiaRenderEngine::drawLayersInternal(
+@@ -1185,6 +1185,10 @@ void SkiaRenderEngine::drawLayersInternal(
                      : item.usePremultipliedAlpha         ? kPremul_SkAlphaType
                                                           : kUnpremul_SkAlphaType;
              sk_sp<SkImage> image = imageTextureRef->makeImage(layerDataspace, alphaType);
@@ -46,47 +46,23 @@ index dc7a408..7c86ae4 100644
  
              auto texMatrix = getSkM44(item.textureTransform).asM33();
              // textureTansform was intended to be passed directly into a shader, so when
-@@ -1231,6 +1235,11 @@ void SkiaRenderEngine::drawGainmapInternal(
-     waitFence(context, sdrFence);
-     const auto sdrTextureRef = getOrCreateBackendTexture(sdr->getBuffer(), false);
-     const auto sdrImage = sdrTextureRef->makeImage(dataspace, kPremul_SkAlphaType);
-+    if (!sdrImage) {
-+        ALOGE("drawGainmapInternal: sdrImage is null, skipping gainmap draw");
-+        resultPromise->set_value(base::unexpected(NO_MEMORY));
-+        return;
-+    }
-     const auto sdrShader =
-             sdrImage->makeShader(SkTileMode::kClamp, SkTileMode::kClamp,
-                                  SkSamplingOptions({SkFilterMode::kLinear, SkMipmapMode::kNone}),
-@@ -1238,6 +1247,11 @@ void SkiaRenderEngine::drawGainmapInternal(
+@@ -1398,6 +1402,11 @@ void SkiaRenderEngine::tonemapAndDrawGainmapInternal(
      waitFence(context, hdrFence);
      const auto hdrTextureRef = getOrCreateBackendTexture(hdr->getBuffer(), false);
      const auto hdrImage = hdrTextureRef->makeImage(dataspace, kPremul_SkAlphaType);
-+    if (!hdrImage) {
-+        ALOGE("drawGainmapInternal: hdrImage is null, skipping gainmap draw");
++    if (!hdrImage || !sdrSurface || !gainmapSurface) {
++        ALOGE("tonemapAndDrawGainmapInternal: null surface/image, skipping gainmap draw");
 +        resultPromise->set_value(base::unexpected(NO_MEMORY));
 +        return;
 +    }
      const auto hdrShader =
              hdrImage->makeShader(SkTileMode::kClamp, SkTileMode::kClamp,
-                                  SkSamplingOptions({SkFilterMode::kLinear, SkMipmapMode::kNone}),
-@@ -1246,6 +1260,11 @@ void SkiaRenderEngine::drawGainmapInternal(
-     static GainmapFactory kGainmapFactory;
-     const auto gainmapShader = kGainmapFactory.createSkShader(sdrShader, hdrShader, hdrSdrRatio);
- 
-+    if (!dstSurface) {
-+        ALOGE("drawGainmapInternal: dstSurface is null, skipping gainmap draw");
-+        resultPromise->set_value(base::unexpected(NO_MEMORY));
-+        return;
-+    }
-     const auto canvas = dstSurface->getCanvas();
-     SkPaint paint;
-     paint.setShader(gainmapShader);
+                                  SkSamplingOptions({SkFilterMode::kNearest, SkMipmapMode::kNone}),
 diff --git a/libs/renderengine/skia/compat/GaneshBackendTexture.cpp b/libs/renderengine/skia/compat/GaneshBackendTexture.cpp
-index 88282e7..292ea60 100644
+index d4a075d..f60c696 100644
 --- a/libs/renderengine/skia/compat/GaneshBackendTexture.cpp
 +++ b/libs/renderengine/skia/compat/GaneshBackendTexture.cpp
-@@ -96,6 +96,24 @@ sk_sp<SkImage> GaneshBackendTexture::makeImage(SkAlphaType alphaType, ui::Datasp
+@@ -94,6 +94,24 @@ sk_sp<SkImage> GaneshBackendTexture::makeImage(SkAlphaType alphaType, ui::Datasp
              SkImages::BorrowTextureFrom(mGrContext.get(), mBackendTexture, kTopLeft_GrSurfaceOrigin,
                                          colorType, alphaType, toSkColorSpace(dataspace),
                                          releaseImageProc, releaseContext);
@@ -111,7 +87,7 @@ index 88282e7..292ea60 100644
      if (!image) {
          logFatalTexture("Unable to generate SkImage.", dataspace, colorType);
      }
-@@ -124,36 +142,36 @@ void GaneshBackendTexture::logFatalTexture(const char* msg, ui::Dataspace datasp
+@@ -122,36 +140,36 @@ void GaneshBackendTexture::logFatalTexture(const char* msg, ui::Dataspace datasp
              GrGLTextureInfo textureInfo;
              bool retrievedTextureInfo =
                      GrBackendTextures::GetGLTextureInfo(mBackendTexture, &textureInfo);

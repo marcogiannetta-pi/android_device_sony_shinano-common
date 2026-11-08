@@ -35,4 +35,24 @@ void _ZN7android13SensorManager16createEventQueueENS_7String8EiNS_8String16E(
     if (sp) *sp = nullptr;
 }
 
+int32_t _ZNK7android16SensorEventQueue13disableSensorEPKNS_6SensorE(void* /*thisptr*/, void* /*sensor*/) {
+    return 0;
+}
+
+int32_t _ZNK7android16SensorEventQueue12enableSensorEPKNS_6SensorE(void* /*thisptr*/, void* /*sensor*/) {
+    return 0;
+}
+
+int32_t _ZNK7android16SensorEventQueue12setEventRateEPKNS_6SensorEx(void* /*thisptr*/, void* /*sensor*/, int64_t /*ns*/) {
+    return 0;
+}
+
+int _ZNK7android16SensorEventQueue5getFdEv(void* /*thisptr*/) {
+    return -1;
+}
+
+ssize_t _ZN7android16SensorEventQueue4readEP12ASensorEventj(void* /*thisptr*/, void* /*events*/, size_t /*numEvents*/) {
+    return 0;
+}
+
 }

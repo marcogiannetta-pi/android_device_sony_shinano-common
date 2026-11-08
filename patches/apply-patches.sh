@@ -24,6 +24,7 @@ declare -A PATCH_MAP=(
     ["hardware_broadcom_fm"]="hardware/broadcom/fm"
     ["hardware_interfaces"]="hardware/interfaces"
     ["hardware_lineage_compat"]="hardware/lineage/compat"
+    ["hardware_qcom-caf_common"]="hardware/qcom-caf/common"
     ["hardware_qcom-caf_msm8974_audio"]="hardware/qcom-caf/msm8974/audio"
     ["hardware_ril"]="hardware/ril"
     ["hardware_sony_thermanager"]="hardware/sony/thermanager"

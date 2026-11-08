@@ -1,36 +1,23 @@
 diff --git a/bpf/headers/include/bpf/BpfMap.h b/bpf/headers/include/bpf/BpfMap.h
-index 1037beb..bf5a322 100644
+index 8ef564d..5be5dd0 100644
 --- a/bpf/headers/include/bpf/BpfMap.h
 +++ b/bpf/headers/include/bpf/BpfMap.h
-@@ -60,14 +60,14 @@ class BpfMapRO {
+@@ -106,6 +106,7 @@ class BpfMapRO {
  
    protected:
      void abortOnMismatch(bool writable) const {
--        if (!mMapFd.ok()) abort();
-+        if (!mMapFd.ok()) return;
-         if (isAtLeastKernelVersion(4, 14, 0)) {
++        if (!isAtLeastKernelVersion(4, 14)) return;
+         if (!mMapFd.ok()) Abort(errno, "mMapFd %d is not valid", mMapFd.get());
+         if (isAtLeastKernelVersion(4, 14)) {
              int flags = bpfGetFdMapFlags(mMapFd);
--            if (flags < 0) abort();
--            if (flags & BPF_F_WRONLY) abort();
--            if (writable && (flags & BPF_F_RDONLY)) abort();
--            if (bpfGetFdKeySize(mMapFd) != sizeof(Key)) abort();
--            if (bpfGetFdValueSize(mMapFd) != sizeof(Value)) abort();
-+            if (flags < 0) return;
-+            if (flags & BPF_F_WRONLY) return;
-+            if (writable && (flags & BPF_F_RDONLY)) return;
-+            if (bpfGetFdKeySize(mMapFd) != sizeof(Key)) return;
-+            if (bpfGetFdValueSize(mMapFd) != sizeof(Value)) return;
-         }
-     }
- 
 diff --git a/bpf/loader/NetBpfLoad.cpp b/bpf/loader/NetBpfLoad.cpp
-index 48ca600..32b33c2 100644
+index 2388647..55cfeb7 100644
 --- a/bpf/loader/NetBpfLoad.cpp
 +++ b/bpf/loader/NetBpfLoad.cpp
-@@ -1681,6 +1681,18 @@ static int doLoad(char** argv, char * const envp[]) {
- int main(int argc, char** argv, char * const envp[]) {
-     InitLogging(argv, &KernelLogger);
+@@ -1947,6 +1947,18 @@ static int doLoad(char** argv, char * const envp[]) {
+ }  // namespace android
  
+ int main(int argc, char** argv, char * const envp[]) {
 +    struct utsname uts;
 +    if (uname(&uts) == 0) {
 +        int major = 0, minor = 0;
@@ -43,99 +30,20 @@ index 48ca600..32b33c2 100644
 +        }
 +    }
 +
-     if (argc == 2 && !strcmp(argv[1], "done")) {
-         // we're being re-exec'ed from platform bpfloader to 'finalize' things
-         if (!SetProperty("bpf.progs_loaded", "1")) {
-diff --git a/bpf/loader/netbpfload.35rc b/bpf/loader/netbpfload.35rc
-index 0fbcb5a..ee08b29 100644
---- a/bpf/loader/netbpfload.35rc
-+++ b/bpf/loader/netbpfload.35rc
-@@ -5,5 +5,5 @@ service bpfloader /apex/com.android.tethering/bin/netbpfload
-     file /dev/kmsg w
-     rlimit memlock 1073741824 1073741824
-     oneshot
--    reboot_on_failure reboot,bpfloader-failed
-+    # reboot_on_failure reboot,bpfloader-failed
-     override
+     if (android::bpf::isAtLeastT) {
+         InitLogging(argv, &KernelLogger);
+     } else {
 diff --git a/bpf/loader/netbpfload.rc b/bpf/loader/netbpfload.rc
-index 10bfbb2..b2c161d 100644
+index 0430dfe..0310703 100644
 --- a/bpf/loader/netbpfload.rc
 +++ b/bpf/loader/netbpfload.rc
-@@ -1,69 +1,11 @@
- # Note: This will actually execute /apex/com.android.tethering/bin/netbpfload
- # by virtue of 'service bpfloader' being overridden by the apex shipped .rc
- # Warning: most of the below settings are irrelevant unless the apex is missing.
--service bpfloader /system/bin/false
--    # netbpfload will do network bpf loading, then execute /system/bin/bpfloader
--    #! capabilities CHOWN SYS_ADMIN NET_ADMIN
--    # The following group memberships are a workaround for lack of DAC_OVERRIDE
--    # and allow us to open (among other things) files that we created and are
--    # no longer root owned (due to CHOWN) but still have group read access to
--    # one of the following groups.  This is not perfect, but a more correct
--    # solution requires significantly more effort to implement.
--    #! group root graphics network_stack net_admin net_bw_acct net_bw_stats net_raw system
-+service bpfloader /system/bin/true
+@@ -12,5 +12,5 @@
+ service bpfloader /system/bin/false
      user root
--    #
--    # Set RLIMIT_MEMLOCK to 1GiB for bpfloader
--    #
--    # Actually only 8MiB would be needed if bpfloader ran as its own uid.
--    #
--    # However, while the rlimit is per-thread, the accounting is system wide.
--    # So, for example, if the graphics stack has already allocated 10MiB of
--    # memlock data before bpfloader even gets a chance to run, it would fail
--    # if its memlock rlimit is only 8MiB - since there would be none left for it.
--    #
--    # bpfloader succeeding is critical to system health, since a failure will
--    # cause netd crashloop and thus system server crashloop... and the only
--    # recovery is a full kernel reboot.
--    #
--    # We've had issues where devices would sometimes (rarely) boot into
--    # a crashloop because bpfloader would occasionally lose a boot time
--    # race against the graphics stack's boot time locked memory allocation.
--    #
--    # Thus bpfloader's memlock has to be 8MB higher then the locked memory
--    # consumption of the root uid anywhere else in the system...
--    # But we don't know what that is for all possible devices...
--    #
--    # Ideally, we'd simply grant bpfloader the IPC_LOCK capability and it
--    # would simply ignore it's memlock rlimit... but it turns that this
--    # capability is not even checked by the kernel's bpf system call.
--    #
--    # As such we simply use 1GiB as a reasonable approximation of infinity.
--    #
--    #! rlimit memlock 1073741824 1073741824
      oneshot
--    #
--    # How to debug bootloops caused by 'bpfloader-failed'.
--    #
--    # 1. On some lower RAM devices (like wembley) you may need to first enable developer mode
--    #    (from the Settings app UI), and change the developer option "Logger buffer sizes"
--    #    from the default (wembley: 64kB) to the maximum (1M) per log buffer.
--    #    Otherwise buffer will overflow before you manage to dump it and you'll get useless logs.
--    #
--    # 2. comment out 'reboot_on_failure reboot,bpfloader-failed' below
--    # 3. rebuild/reflash/reboot
--    # 4. as the device is booting up capture bpfloader logs via:
--    #    adb logcat -s 'bpfloader:*' 'LibBpfLoader:*' 'NetBpfLoad:*' 'NetBpfLoader:*'
--    #
--    # something like:
--    #   $ adb reboot; sleep 1; adb wait-for-device; adb root; sleep 1; adb wait-for-device; adb logcat -s 'bpfloader:*' 'LibBpfLoader:*' 'NetBpfLoad:*' 'NetBpfLoader:*'
--    # will take care of capturing logs as early as possible
--    #
--    # 5. look through the logs from the kernel's bpf verifier that bpfloader dumps out,
--    #    it usually makes sense to search back from the end and find the particular
--    #    bpf verifier failure that caused bpfloader to terminate early with an error code.
--    #    This will probably be something along the lines of 'too many jumps' or
--    #    'cannot prove return value is 0 or 1' or 'unsupported / unknown operation / helper',
--    #    'invalid bpf_context access', etc.
--    #
 -    reboot_on_failure reboot,netbpfload-missing
 +    # reboot_on_failure reboot,netbpfload-missing
      updatable
-+
-+on load-bpf-programs
-+    setprop bpf.progs_loaded 1
 diff --git a/framework/src/android/net/BpfNetMapsUtils.java b/framework/src/android/net/BpfNetMapsUtils.java
 index 1760fa7..c18d04b 100644
 --- a/framework/src/android/net/BpfNetMapsUtils.java
@@ -310,10 +218,10 @@ index b7c4e34..f87a457 100644
          }
      }
 diff --git a/service-t/native/libs/libnetworkstats/BpfNetworkStats.cpp b/service-t/native/libs/libnetworkstats/BpfNetworkStats.cpp
-index d3e331e..7630c44 100644
+index ae8dbbe..0760396 100644
 --- a/service-t/native/libs/libnetworkstats/BpfNetworkStats.cpp
 +++ b/service-t/native/libs/libnetworkstats/BpfNetworkStats.cpp
-@@ -51,6 +51,11 @@ const BpfMapRO<uint32_t, StatsValue>& getIfaceStatsMap() {
+@@ -74,6 +74,11 @@ static inline const IfaceValue& updateCache(unsigned i, const IfaceValue &v) {
  }
  
  Result<IfaceValue> ifindex2name(const uint32_t ifindex) {
@@ -322,10 +230,10 @@ index d3e331e..7630c44 100644
 +        if (if_indextoname(ifindex, iv.name)) return iv;
 +        return ErrnoErrorf("ifindex2name failed");
 +    }
-     Result<IfaceValue> v = getIfaceIndexNameMap().readValue(ifindex);
-     if (v.ok()) return v;
-     IfaceValue iv = {};
-@@ -64,6 +69,7 @@ void bpfRegisterIface(const char* iface) {
+     if (ifindex < cacheSize) {
+ #ifdef CACHE_IS_ATOMIC
+         IfaceValue c = cache[ifindex].load(std::memory_order_relaxed);
+@@ -96,6 +101,7 @@ void bpfRegisterIface(const char* iface) {
      if (strlen(iface) >= sizeof(IfaceValue)) return;
      uint32_t ifindex = if_nametoindex(iface);
      if (!ifindex) return;
@@ -333,7 +241,7 @@ index d3e331e..7630c44 100644
      IfaceValue ifname = {};
      strlcpy(ifname.name, iface, sizeof(ifname.name));
      getIfaceIndexNameMap().writeValue(ifindex, ifname, BPF_ANY);
-@@ -71,9 +77,10 @@ void bpfRegisterIface(const char* iface) {
+@@ -104,9 +110,10 @@ void bpfRegisterIface(const char* iface) {
  
  int bpfGetUidStatsInternal(uid_t uid, StatsValue* stats,
                             const BpfMapRO<uint32_t, StatsValue>& appUidStatsMap) {
@@ -345,15 +253,7 @@ index d3e331e..7630c44 100644
          return (statsEntry.error().code() == ENOENT) ? 0 : -statsEntry.error().code();
      }
      *stats = statsEntry.value();
-@@ -89,6 +96,7 @@ int bpfGetIfaceStatsInternal(const char* iface, StatsValue* stats,
-                              const BpfMapRO<uint32_t, StatsValue>& ifaceStatsMap,
-                              const IfIndexToNameFunc ifindex2name) {
-     *stats = {};
-+    if (!ifaceStatsMap.isValid()) return 0;
-     int64_t unknownIfaceBytesTotal = 0;
-     const auto processIfaceStats =
-             [iface, stats, ifindex2name, &unknownIfaceBytesTotal](
-@@ -195,11 +203,15 @@ int parseBpfNetworkStatsDetail(std::vector<stats_line>* lines) {
+@@ -255,11 +262,15 @@ int parseBpfNetworkStatsDetail(std::vector<stats_line>* lines) {
      static BpfMapRO<uint32_t, uint32_t> configurationMap(CONFIGURATION_MAP_PATH);
      static BpfMap<StatsKey, StatsValue> statsMapA(STATS_MAP_A_PATH);
      static BpfMap<StatsKey, StatsValue> statsMapB(STATS_MAP_B_PATH);
@@ -371,19 +271,8 @@ index d3e331e..7630c44 100644
      }
      // The target map for stats reading should be the inactive map, which is opposite
      // from the config value.
-@@ -239,6 +251,10 @@ int parseBpfNetworkStatsDetail(std::vector<stats_line>* lines) {
- int parseBpfNetworkStatsDevInternal(std::vector<stats_line>& lines,
-                                     const BpfMapRO<uint32_t, StatsValue>& statsMap,
-                                     const IfIndexToNameFunc ifindex2name) {
-+    if (!statsMap.isValid()) {
-+        ALOGW("statsMap not valid, returning empty dev stats");
-+        return 0;
-+    }
-     int64_t unknownIfaceBytesTotal = 0;
-     const auto processDetailIfaceStats = [&lines, &unknownIfaceBytesTotal, ifindex2name, &statsMap](
-                                              const uint32_t& key, const StatsValue& value,
 diff --git a/service-t/src/com/android/server/net/BpfInterfaceMapHelper.java b/service-t/src/com/android/server/net/BpfInterfaceMapHelper.java
-index 3c95b8e..2977ee7 100644
+index d569b78..dfb1554 100644
 --- a/service-t/src/com/android/server/net/BpfInterfaceMapHelper.java
 +++ b/service-t/src/com/android/server/net/BpfInterfaceMapHelper.java
 @@ -67,6 +67,9 @@ public class BpfInterfaceMapHelper {
@@ -397,18 +286,10 @@ index 3c95b8e..2977ee7 100644
              final InterfaceMapValue value = mIndexToIfaceBpfMap.getValue(new S32(index));
              if (value == null) {
 diff --git a/service-t/src/com/android/server/net/NetworkStatsFactory.java b/service-t/src/com/android/server/net/NetworkStatsFactory.java
-index 5f66f47..f31df5e 100644
+index 7d48b71..e17179e 100644
 --- a/service-t/src/com/android/server/net/NetworkStatsFactory.java
 +++ b/service-t/src/com/android/server/net/NetworkStatsFactory.java
-@@ -27,6 +27,7 @@ import android.net.NetworkStats;
- import android.net.UnderlyingNetworkInfo;
- import android.os.ServiceSpecificException;
- import android.os.SystemClock;
-+import android.util.Log;
- 
- import com.android.internal.annotations.GuardedBy;
- import com.android.internal.annotations.VisibleForTesting;
-@@ -86,9 +87,13 @@ public class NetworkStatsFactory {
+@@ -110,9 +110,13 @@ public class NetworkStatsFactory {
          @NonNull
          public NetworkStats getNetworkStatsDetail() throws IOException {
              final NetworkStats stats = new NetworkStats(SystemClock.elapsedRealtime(), 0);
@@ -425,7 +306,7 @@ index 5f66f47..f31df5e 100644
              }
              return stats;
          }
-@@ -99,9 +104,13 @@ public class NetworkStatsFactory {
+@@ -123,9 +127,13 @@ public class NetworkStatsFactory {
          @NonNull
          public NetworkStats getNetworkStatsDev() throws IOException {
              final NetworkStats stats = new NetworkStats(SystemClock.elapsedRealtime(), 6);
@@ -442,7 +323,7 @@ index 5f66f47..f31df5e 100644
              }
              return stats;
          }
-@@ -183,8 +192,8 @@ public class NetworkStatsFactory {
+@@ -231,8 +239,8 @@ public class NetworkStatsFactory {
              // Do a active map stats swap. Once the swap completes, this code
              // can read and clean the inactive map without races.
              mBpfNetMaps.swapActiveStatsMap();
@@ -454,10 +335,10 @@ index 5f66f47..f31df5e 100644
      }
  
 diff --git a/service-t/src/com/android/server/net/NetworkStatsService.java b/service-t/src/com/android/server/net/NetworkStatsService.java
-index fb712a1..00eb3bc 100644
+index c82955f..b7a4199 100644
 --- a/service-t/src/com/android/server/net/NetworkStatsService.java
 +++ b/service-t/src/com/android/server/net/NetworkStatsService.java
-@@ -942,7 +942,8 @@ public class NetworkStatsService extends INetworkStatsService.Stub {
+@@ -916,7 +916,8 @@ public class NetworkStatsService extends INetworkStatsService.Stub {
              try {
                  return new BpfMap<>(IFACE_STATS_MAP_PATH, S32.class, StatsMapValue.class);
              } catch (ErrnoException e) {
@@ -467,7 +348,7 @@ index fb712a1..00eb3bc 100644
              }
          }
  
-@@ -3361,6 +3362,9 @@ public class NetworkStatsService extends INetworkStatsService.Stub {
+@@ -3252,6 +3253,9 @@ public class NetworkStatsService extends INetworkStatsService.Stub {
  
      @GuardedBy("mStatsLock")
      private void dumpIfaceStatsMapLocked(final IndentingPrintWriter pw) {
@@ -478,7 +359,7 @@ index fb712a1..00eb3bc 100644
                  "ifaceIndex ifaceName rxBytes rxPackets txBytes txPackets",
                  (key, value) -> {
 diff --git a/service/jni/com_android_server_connectivity_ClatCoordinator.cpp b/service/jni/com_android_server_connectivity_ClatCoordinator.cpp
-index c0082bb..85fab78 100644
+index 70991eb..d1b7e4a 100644
 --- a/service/jni/com_android_server_connectivity_ClatCoordinator.cpp
 +++ b/service/jni/com_android_server_connectivity_ClatCoordinator.cpp
 @@ -101,6 +101,9 @@ static void verifyClatPerms() {
@@ -501,12 +382,12 @@ index c0082bb..85fab78 100644
  
  #undef V
 diff --git a/service/src/com/android/server/BpfNetMaps.java b/service/src/com/android/server/BpfNetMaps.java
-index 44868b2..496e2c0 100644
+index a968193..eacbcb2 100644
 --- a/service/src/com/android/server/BpfNetMaps.java
 +++ b/service/src/com/android/server/BpfNetMaps.java
-@@ -186,13 +186,104 @@ public class BpfNetMaps {
-         sIngressDiscardMap = ingressDiscardMap;
+@@ -217,13 +217,104 @@ public class BpfNetMaps {
      }
+ 
  
 +    private static class InMemoryBpfMap<K extends Struct, V extends Struct> implements IBpfMap<K, V> {
 +        private final java.util.concurrent.ConcurrentHashMap<K, V> mMap = new java.util.concurrent.ConcurrentHashMap<>();
@@ -611,7 +492,7 @@ index 44868b2..496e2c0 100644
          }
      }
  
-@@ -201,8 +292,9 @@ public class BpfNetMaps {
+@@ -232,8 +323,9 @@ public class BpfNetMaps {
          try {
              return SingleWriterBpfMap.getSingleton(
                      UID_OWNER_MAP_PATH, S32.class, UidOwnerValue.class);
@@ -623,7 +504,7 @@ index 44868b2..496e2c0 100644
          }
      }
  
-@@ -211,8 +303,9 @@ public class BpfNetMaps {
+@@ -242,8 +334,9 @@ public class BpfNetMaps {
          try {
              return SingleWriterBpfMap.getSingleton(
                      UID_PERMISSION_MAP_PATH, S32.class, U8.class);
@@ -635,10 +516,10 @@ index 44868b2..496e2c0 100644
          }
      }
  
-@@ -222,8 +315,9 @@ public class BpfNetMaps {
+@@ -253,8 +346,9 @@ public class BpfNetMaps {
              // Cannot use SingleWriterBpfMap because it's written by ClatCoordinator as well.
              return new BpfMap<>(COOKIE_TAG_MAP_PATH,
-                     CookieTagMapKey.class, CookieTagMapValue.class);
+                     S64.class, CookieTagMapValue.class);
 -        } catch (ErrnoException e) {
 -            throw new IllegalStateException("Cannot open cookie tag map", e);
 +        } catch (Exception e) {
@@ -647,7 +528,7 @@ index 44868b2..496e2c0 100644
          }
      }
  
-@@ -232,8 +326,9 @@ public class BpfNetMaps {
+@@ -263,8 +357,9 @@ public class BpfNetMaps {
          try {
              return SingleWriterBpfMap.getSingleton(
                      DATA_SAVER_ENABLED_MAP_PATH, S32.class, U8.class);
@@ -659,7 +540,7 @@ index 44868b2..496e2c0 100644
          }
      }
  
-@@ -242,8 +337,9 @@ public class BpfNetMaps {
+@@ -273,8 +368,9 @@ public class BpfNetMaps {
          try {
              return SingleWriterBpfMap.getSingleton(INGRESS_DISCARD_MAP_PATH,
                      IngressDiscardKey.class, IngressDiscardValue.class);
@@ -671,7 +552,31 @@ index 44868b2..496e2c0 100644
          }
      }
  
-@@ -255,14 +351,14 @@ public class BpfNetMaps {
+@@ -283,8 +379,9 @@ public class BpfNetMaps {
+         try {
+             return SingleWriterBpfMap.getSingleton(LOCAL_NET_BLOCKED_UID_MAP_PATH,
+                     U32.class, Bool.class);
+-        } catch (ErrnoException e) {
+-            throw new IllegalStateException("Cannot open local_net_blocked_uid map", e);
++        } catch (Exception e) {
++            Log.w(TAG, "Cannot open local_net_blocked_uid map, using in-memory map fallback: " + e);
++            return new InMemoryBpfMap<>();
+         }
+     }
+ 
+@@ -293,8 +390,9 @@ public class BpfNetMaps {
+         try {
+             return SingleWriterBpfMap.getSingleton(LOCAL_NET_ACCESS_MAP_PATH,
+                     LocalNetAccessKey.class, Bool.class);
+-        } catch (ErrnoException e) {
+-            throw new IllegalStateException("Cannot open local_net_access map", e);
++        } catch (Exception e) {
++            Log.w(TAG, "Cannot open local_net_access map, using in-memory map fallback: " + e);
++            return new InMemoryBpfMap<>();
+         }
+     }
+ 
+@@ -306,14 +404,14 @@ public class BpfNetMaps {
          try {
              sConfigurationMap.updateEntry(UID_RULES_CONFIGURATION_KEY,
                      new U32(UID_RULES_DEFAULT_CONFIGURATION));
@@ -690,7 +595,7 @@ index 44868b2..496e2c0 100644
          }
  
          if (sUidOwnerMap == null) {
-@@ -270,8 +366,8 @@ public class BpfNetMaps {
+@@ -321,8 +419,8 @@ public class BpfNetMaps {
          }
          try {
              sUidOwnerMap.clear();
@@ -701,7 +606,7 @@ index 44868b2..496e2c0 100644
          }
  
          if (sUidPermissionMap == null) {
-@@ -287,8 +383,8 @@ public class BpfNetMaps {
+@@ -338,8 +436,8 @@ public class BpfNetMaps {
          }
          try {
              sDataSaverEnabledMap.updateEntry(DATA_SAVER_ENABLED_KEY, new U8(DATA_SAVER_DISABLED));
@@ -712,18 +617,7 @@ index 44868b2..496e2c0 100644
          }
  
          if (sIngressDiscardMap == null) {
-@@ -296,8 +392,8 @@ public class BpfNetMaps {
-         }
-         try {
-             sIngressDiscardMap.clear();
--        } catch (ErrnoException e) {
--            throw new IllegalStateException("Failed to initialize ingress discard map", e);
-+        } catch (Exception e) {
-+            Log.w(TAG, "Failed to initialize ingress discard map: " + e);
-         }
-     }
- 
-@@ -339,7 +435,8 @@ public class BpfNetMaps {
+@@ -411,7 +509,8 @@ public class BpfNetMaps {
              try {
                  BpfMap.synchronizeKernelRCU();
              } catch (ErrnoException e) {
@@ -733,7 +627,7 @@ index 44868b2..496e2c0 100644
              }
              return 0;
          }
-@@ -749,15 +846,17 @@ public class BpfNetMaps {
+@@ -840,15 +939,17 @@ public class BpfNetMaps {
  
          try {
              synchronized (sCurrentStatsMapConfigLock) {
@@ -756,10 +650,10 @@ index 44868b2..496e2c0 100644
  
          // After changing the config, it's needed to make sure all the current running eBPF
 diff --git a/staticlibs/device/com/android/net/module/util/BpfDump.java b/staticlibs/device/com/android/net/module/util/BpfDump.java
-index 4227194..15e6c54 100644
+index d79f52e..ba671f0 100644
 --- a/staticlibs/device/com/android/net/module/util/BpfDump.java
 +++ b/staticlibs/device/com/android/net/module/util/BpfDump.java
-@@ -114,6 +114,10 @@ public class BpfDump {
+@@ -115,6 +115,10 @@ public class BpfDump {
      public static <K extends Struct, V extends Struct> void dumpMap(IBpfMap<K, V> map,
              PrintWriter pw, String mapName, String header, BiFunction<K, V, String> entryToString) {
          pw.println(mapName + ":");

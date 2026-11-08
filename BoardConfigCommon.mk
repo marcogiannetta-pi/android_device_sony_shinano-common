@@ -32,8 +32,8 @@ BOARD_KERNEL_CMDLINE := androidboot.hardware=qcom msm_rtb.filter=0x37 ehci-hcd.p
 USE_CUSTOM_AUDIO_POLICY := 1
 USE_XML_AUDIO_POLICY_CONF := 1
 
-# Binder API version
-TARGET_USES_64_BIT_BINDER := true
+# Binder API version (64-bit binder is default in Android 16)
+# TARGET_USES_64_BIT_BINDER := true
 
 # Bluetooth
 BOARD_HAVE_BLUETOOTH_BCM := true

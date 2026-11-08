@@ -17,30 +17,50 @@
 #include <ui/GraphicBuffer.h>
 #include <ui/GraphicBufferMapper.h>
 #include <ui/Rect.h>
+#include <utils/RefBase.h>
 #include <new>
 
 namespace android {
+
+// ShimRef fits into the legacy 136-byte buffer allocated by libsomc_chokoballpal.
+// Modern GraphicBuffer is 1784 bytes and overflows the 136-byte allocation.
+class ShimRef : public RefBase {
+public:
+    sp<GraphicBuffer> mRealBuffer;
+    virtual ~ShimRef() {
+        mRealBuffer.clear();
+    }
+};
 
 // Deprecated 7-argument GraphicBuffer constructor (32-bit inUsage)
 extern "C" void _ZN7android13GraphicBufferC1EjjijjP13native_handleb(
         void* thisptr, uint32_t inWidth, uint32_t inHeight,
         PixelFormat inFormat, uint32_t inUsage, uint32_t inStride,
         native_handle_t* inHandle, bool keepOwnership) {
-    ALOGI("GraphicBufferShim: C1 this=%p (sizeof=%zu) w=%u h=%u fmt=%d usage=0x%x stride=%u handle=%p keep=%d",
-          thisptr, sizeof(GraphicBuffer), inWidth, inHeight, inFormat, inUsage, inStride, inHandle, keepOwnership);
-    new (thisptr) GraphicBuffer(inHandle, keepOwnership ? GraphicBuffer::TAKE_HANDLE : GraphicBuffer::WRAP_HANDLE,
-                                inWidth, inHeight, inFormat, 1, static_cast<uint64_t>(inUsage), inStride);
+    ALOGI("GraphicBufferShim: C1 this=%p w=%u h=%u fmt=%d usage=0x%x stride=%u handle=%p keep=%d",
+          thisptr, inWidth, inHeight, inFormat, inUsage, inStride, inHandle, keepOwnership);
+    auto real = sp<GraphicBuffer>::make(
+            inHandle, keepOwnership ? GraphicBuffer::TAKE_HANDLE : GraphicBuffer::WRAP_HANDLE,
+            inWidth, inHeight, inFormat, 1, static_cast<uint64_t>(inUsage), inStride);
+    ShimRef* shim = new (thisptr) ShimRef();
+    shim->mRealBuffer = real;
 }
 
 // Inlined getNativeBuffer() out-of-line ABI export
 extern "C" ANativeWindowBuffer* _ZNK7android13GraphicBuffer15getNativeBufferEv(const GraphicBuffer* buffer) {
-    ALOGI("GraphicBufferShim: getNativeBuffer(%p)", buffer);
-    return static_cast<ANativeWindowBuffer*>(const_cast<GraphicBuffer*>(buffer));
+    const ShimRef* shim = reinterpret_cast<const ShimRef*>(buffer);
+    if (shim && shim->mRealBuffer != nullptr) {
+        return static_cast<ANativeWindowBuffer*>(shim->mRealBuffer.get());
+    }
+    return nullptr;
 }
 
 // Inlined initCheck() out-of-line ABI export
 extern "C" status_t _ZNK7android13GraphicBuffer9initCheckEv(const GraphicBuffer* buffer) {
-    ALOGI("GraphicBufferShim: initCheck(%p) -> OK", buffer);
+    const ShimRef* shim = reinterpret_cast<const ShimRef*>(buffer);
+    if (shim && shim->mRealBuffer != nullptr) {
+        return shim->mRealBuffer->initCheck();
+    }
     return android::OK;
 }
 

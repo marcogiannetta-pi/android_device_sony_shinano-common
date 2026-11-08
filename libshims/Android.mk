@@ -20,14 +20,7 @@ LOCAL_PATH := $(call my-dir)
 include $(CLEAR_VARS)
 
 LOCAL_SRC_FILES := \
-    ui/GraphicBufferShim.cpp \
-    utils/Looper.cpp \
-    utils/VectorImpl.cpp
-
-LOCAL_C_INCLUDES := \
-    $(LOCAL_PATH)/include \
-    system/core/libutils \
-    system/core/libutils/binder
+    ui/GraphicBufferShim.cpp
 
 LOCAL_SHARED_LIBRARIES := \
     libbase \
@@ -51,10 +44,10 @@ LOCAL_SRC_FILES := \
     sensor/SensorManager.cpp
 
 LOCAL_SHARED_LIBRARIES := \
-    libsensor \
     libutils
 
 LOCAL_MODULE := libshim_sensor
+LOCAL_PROPRIETARY_MODULE := true
 LOCAL_MODULE_TAGS := optional
 LOCAL_MODULE_CLASS := SHARED_LIBRARIES
 

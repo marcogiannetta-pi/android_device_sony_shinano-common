@@ -1,16 +1,16 @@
 diff --git a/libc/SYSCALLS.TXT b/libc/SYSCALLS.TXT
-index 8c5572e..f6dbef2 100644
+index 226ba70..b69126a 100644
 --- a/libc/SYSCALLS.TXT
 +++ b/libc/SYSCALLS.TXT
-@@ -161,7 +161,7 @@ int linkat(int, const char*, int, const char*, int)  all
- int mkdirat(int, const char*, mode_t)  all
- int mknodat(int, const char*, mode_t, dev_t)  all
- ssize_t readlinkat(int, const char*, char*, size_t)  all
--int renameat2(int, const char*, int, const char*, unsigned)  all
-+int __renameat2:renameat2(int, const char*, int, const char*, unsigned)  all
- int symlinkat(const char*, int, const char*)  all
- int unlinkat(int, const char*, int)   all
- int utimensat(int, const char*, const struct timespec times[2], int)  all
+@@ -168,7 +168,7 @@ linkat(int, const char*, int, const char*, int)  all
+ mkdirat(int, const char*, mode_t)  all
+ mknodat(int, const char*, mode_t, dev_t)  all
+ readlinkat(int, const char*, char*, size_t)  all
+-renameat2(int, const char*, int, const char*, unsigned)  all
++__renameat2:renameat2(int, const char*, int, const char*, unsigned)  all
+ symlinkat(const char*, int, const char*)  all
+ unlinkat(int, const char*, int)   all
+ utimensat(int, const char*, const struct timespec times[2], int)  all
 diff --git a/libc/bionic/rename.cpp b/libc/bionic/rename.cpp
 index 89786f7..eac1e1d 100644
 --- a/libc/bionic/rename.cpp
@@ -61,3 +61,56 @@ index 89786f7..eac1e1d 100644
  
  int rename(const char* old_path, const char* new_path) {
    return renameat2(AT_FDCWD, old_path, AT_FDCWD, new_path, 0);
+diff --git a/libc/bionic/sys_epoll.cpp b/libc/bionic/sys_epoll.cpp
+index be97818..5015313 100644
+--- a/libc/bionic/sys_epoll.cpp
++++ b/libc/bionic/sys_epoll.cpp
+@@ -80,7 +80,19 @@ int epoll_pwait2_64(int fd, epoll_event* events, int max_events, const timespec*
+     kts_ptr = &kts;
+   }
+ #endif
+-  return __epoll_pwait2(fd, events, max_events, kts_ptr, ss, sizeof(*ss));
++  static bool epoll_pwait2_supported = true;
++  if (epoll_pwait2_supported) {
++    int rc = __epoll_pwait2(fd, events, max_events, kts_ptr, ss, sizeof(*ss));
++    if (rc >= 0 || errno != ENOSYS) {
++      return rc;
++    }
++    epoll_pwait2_supported = false;
++  }
++  int timeout_ms = -1;
++  if (timeout) {
++    timeout_ms = timeout->tv_sec * 1000 + (timeout->tv_nsec + 999999) / 1000000;
++  }
++  return epoll_pwait64(fd, events, max_events, timeout_ms, ss);
+ }
+ 
+ int epoll_wait(int fd, struct epoll_event* events, int max_events, int timeout) {
+diff --git a/libc/bionic/system_property_api.cpp b/libc/bionic/system_property_api.cpp
+index ed30fc2..ff2f19e 100644
+--- a/libc/bionic/system_property_api.cpp
++++ b/libc/bionic/system_property_api.cpp
+@@ -56,7 +56,7 @@ int __system_property_set_filename(const char*) {
+ __BIONIC_WEAK_FOR_NATIVE_BRIDGE
+ int __system_property_area_init() {
+   bool fsetxattr_fail = false;
+-  return system_properties.AreaInit(PROP_DIRNAME, &fsetxattr_fail) && !fsetxattr_fail ? 0 : -1;
++  return system_properties.AreaInit(PROP_DIRNAME, &fsetxattr_fail) ? 0 : -1;
+ }
+ 
+ __BIONIC_WEAK_FOR_NATIVE_BRIDGE
+diff --git a/libc/upstream-openbsd/android/include/arc4random.h b/libc/upstream-openbsd/android/include/arc4random.h
+index 1940398..48026be 100644
+--- a/libc/upstream-openbsd/android/include/arc4random.h
++++ b/libc/upstream-openbsd/android/include/arc4random.h
+@@ -60,7 +60,9 @@ static inline int _rs_allocate(struct _rs** rsp, struct _rsx** rsxp) {
+   }
+ 
+   // Equivalent to OpenBSD's minherit(MAP_INHERIT_ZERO).
+-  if (madvise(p, size, MADV_WIPEONFORK) == -1) {
++  // Note: MADV_WIPEONFORK was introduced in Linux 4.14; on legacy kernels (e.g. Linux 3.4),
++  // madvise returns -1 with EINVAL. Ignore EINVAL/ENOSYS so legacy kernels don't abort.
++  if (madvise(p, size, MADV_WIPEONFORK) == -1 && errno != EINVAL && errno != ENOSYS) {
+     async_safe_fatal("arc4random data MADV_WIPEONFORK failed: %m");
+   }
+ 
