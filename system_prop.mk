@@ -84,9 +84,11 @@ PRODUCT_PROPERTY_OVERRIDES += \
 # Graphics & SurfaceFlinger
 PRODUCT_PROPERTY_OVERRIDES += \
     ro.surface_flinger.supports_background_blur=0 \
+    persist.sysui.disableBlur=true \
     debug.sf.disable_backpressure=1 \
     debug.sf.latch_unsignaled=1
 
-# Background App Limits
+# Background App Limits & UI Compiler Filter
 PRODUCT_PROPERTY_OVERRIDES += \
-    ro.sys.fw.bg_apps_limit=20
+    ro.sys.fw.bg_apps_limit=12 \
+    dalvik.vm.systemuicompilerfilter=speed

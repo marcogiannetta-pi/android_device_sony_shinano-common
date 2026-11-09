@@ -93,4 +93,7 @@
     <!-- Idle Receive current for wifi radio. 0 by default-->
     <integer translatable="false" name="config_wifi_idle_receive_cur_ma">3</integer>
 
+    <!-- Avoid GPU composition overhead and excessive RAM caching on low RAM / legacy devices -->
+    <bool name="config_avoidGfxAccel">true</bool>
+
 </resources>

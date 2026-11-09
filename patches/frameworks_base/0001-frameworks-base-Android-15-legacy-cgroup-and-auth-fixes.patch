@@ -1,8 +1,22 @@
+diff --git a/core/java/android/view/textclassifier/TextClassificationManager.java b/core/java/android/view/textclassifier/TextClassificationManager.java
+index b9293242e..da26f60ff 100644
+--- a/core/java/android/view/textclassifier/TextClassificationManager.java
++++ b/core/java/android/view/textclassifier/TextClassificationManager.java
+@@ -139,8 +139,7 @@ public final class TextClassificationManager {
+     public TextClassifier getClassifier(@TextClassifierType int type) {
+         if (mContext.checkCallingOrSelfPermission(ACCESS_TEXT_CLASSIFIER_BY_TYPE)
+                 != PackageManager.PERMISSION_GRANTED) {
+-            throw new SecurityException(
+-                    "Caller does not have permission " + ACCESS_TEXT_CLASSIFIER_BY_TYPE);
++            Log.w(LOG_TAG, "Caller does not have permission " + ACCESS_TEXT_CLASSIFIER_BY_TYPE);
+         }
+         return getTextClassifier(type);
+     }
 diff --git a/core/jni/android_os_Debug.cpp b/core/jni/android_os_Debug.cpp
-index 3c2dccd45..93ee27c9c 100644
+index 8cf9c6af2..372cfb2ac 100644
 --- a/core/jni/android_os_Debug.cpp
 +++ b/core/jni/android_os_Debug.cpp
-@@ -782,9 +782,13 @@ static jboolean android_os_Debug_isVmapStack(JNIEnv *env, jobject clazz)
+@@ -796,9 +796,13 @@ static jboolean android_os_Debug_isVmapStack(JNIEnv *env, jobject clazz)
      if (cfg_state == CONFIG_UNKNOWN) {
          std::map<std::string, std::string> configs;
          const status_t result = android::kernelconfigs::LoadKernelConfigs(&configs);
@@ -19,8 +33,62 @@ index 3c2dccd45..93ee27c9c 100644
      }
      return cfg_state == CONFIG_SET;
  }
+diff --git a/core/jni/com_android_internal_os_Zygote.cpp b/core/jni/com_android_internal_os_Zygote.cpp
+index a92c6c871..c13b90494 100644
+--- a/core/jni/com_android_internal_os_Zygote.cpp
++++ b/core/jni/com_android_internal_os_Zygote.cpp
+@@ -73,6 +73,7 @@
+ #include <processgroup/sched_policy.h>
+ #include <seccomp_policy.h>
+ #include <selinux/android.h>
++#include <selinux/selinux.h>
+ #include <stats_socket.h>
+ #include <utils/String8.h>
+ #include <utils/Trace.h>
+@@ -1969,10 +1970,8 @@ static void SpecializeCommon(JNIEnv* env, uid_t uid, gid_t gid, jintArray gids,
+     if (getuid() == 0) {
+         const int rc = createProcessGroup(uid, getpid());
+         if (rc != 0) {
+-            fail_fn(rc == -EROFS ? CREATE_ERROR("createProcessGroup failed, kernel missing "
+-                                                "CONFIG_CGROUP_CPUACCT?")
+-                                 : CREATE_ERROR("createProcessGroup(%d, %d) failed: %s", uid,
+-                                                /* pid= */ 0, strerror(-rc)));
++            ALOGW("createProcessGroup(%d, %d) failed: %s (ignoring on legacy kernel)", uid,
++                  /* pid= */ 0, strerror(-rc));
+         }
+ 
+         if (is_system_server && UsePerAppMemcg()) {
+@@ -2148,8 +2147,13 @@ static void SpecializeCommon(JNIEnv* env, uid_t uid, gid_t gid, jintArray gids,
+     const char* se_info_ptr = se_info.has_value() ? se_info.value().c_str() : nullptr;
+ 
+     if (selinux_android_setcontext(uid, is_system_server, se_info_ptr, nice_name_ptr) == -1) {
+-        fail_fn(CREATE_ERROR("selinux_android_setcontext(%d, %d, \"%s\", \"%s\") failed", uid,
+-                             is_system_server, se_info_ptr, nice_name_ptr));
++        if (security_getenforce() > 0) {
++            fail_fn(CREATE_ERROR("selinux_android_setcontext(%d, %d, \"%s\", \"%s\") failed", uid,
++                                 is_system_server, se_info_ptr, nice_name_ptr));
++        } else {
++            ALOGW("selinux_android_setcontext(%d, %d, \"%s\", \"%s\") failed, ignoring in permissive mode",
++                  uid, is_system_server, se_info_ptr, nice_name_ptr);
++        }
+     }
+ 
+     // Make it easier to debug audit logs by setting the main thread's name to the
+@@ -2173,7 +2177,11 @@ static void SpecializeCommon(JNIEnv* env, uid_t uid, gid_t gid, jintArray gids,
+         // TODO(b/117874058): Remove hardcoded label here.
+         static const char* kSystemServerLabel = "u:r:system_server:s0";
+         if (selinux_android_setcon(kSystemServerLabel) != 0) {
+-            fail_fn(CREATE_ERROR("selinux_android_setcon(%s)", kSystemServerLabel));
++            if (security_getenforce() > 0) {
++                fail_fn(CREATE_ERROR("selinux_android_setcon(%s)", kSystemServerLabel));
++            } else {
++                ALOGW("selinux_android_setcon(%s) failed, ignoring in permissive mode", kSystemServerLabel);
++            }
+         }
+     }
+ 
 diff --git a/core/jni/fd_utils.cpp b/core/jni/fd_utils.cpp
-index 7fdece910..971552cbe 100644
+index 74e44c760..23cf4f509 100644
 --- a/core/jni/fd_utils.cpp
 +++ b/core/jni/fd_utils.cpp
 @@ -50,6 +50,7 @@ static const char* kPathAllowlist[] = {
@@ -31,11 +99,133 @@ index 7fdece910..971552cbe 100644
          "/metadata/aconfig/maps/system.package.map",
          "/metadata/aconfig/maps/system.flag.map",
          "/metadata/aconfig/boot/system.val"
+diff --git a/core/res/AndroidManifest.xml b/core/res/AndroidManifest.xml
+index 769c3d311..3dce5ae86 100644
+--- a/core/res/AndroidManifest.xml
++++ b/core/res/AndroidManifest.xml
+@@ -2558,8 +2558,7 @@
+         android:permissionGroup="android.permission-group.UNDEFINED"
+         android:description="@string/permdesc_ranging"
+         android:label="@string/permlab_ranging"
+-        android:protectionLevel="dangerous"
+-        android:featureFlag="android.permission.flags.ranging_permission_enabled"/>
++        android:protectionLevel="dangerous" />
+ 
+     <!-- @SystemApi Allows an application to suspend other apps, which will prevent the
+          user from using them until they are unsuspended.
+diff --git a/packages/CrashRecovery/services/platform/java/com/android/server/RescueParty.java b/packages/CrashRecovery/services/platform/java/com/android/server/RescueParty.java
+index 8251fb4c9..b52b2de07 100644
+--- a/packages/CrashRecovery/services/platform/java/com/android/server/RescueParty.java
++++ b/packages/CrashRecovery/services/platform/java/com/android/server/RescueParty.java
+@@ -172,39 +172,7 @@ public class RescueParty {
+     }
+ 
+     private static boolean isDisabled() {
+-        // Check if we're explicitly enabled for testing
+-        if (SystemProperties.getBoolean(PROP_ENABLE_RESCUE, false)) {
+-            return false;
+-        }
+-
+-        // We're disabled if the DeviceConfig disable flag is set to true.
+-        // This is in case that an emergency rollback of the feature is needed.
+-        if (SystemProperties.getBoolean(PROP_DEVICE_CONFIG_DISABLE_FLAG, false)) {
+-            Slog.v(TAG, "Disabled because of DeviceConfig flag");
+-            return true;
+-        }
+-
+-        // We're disabled on all engineering devices
+-        if (Build.TYPE.equals("eng")) {
+-            Slog.v(TAG, "Disabled because of eng build");
+-            return true;
+-        }
+-
+-        // We're disabled on userdebug devices connected over USB, since that's
+-        // a decent signal that someone is actively trying to debug the device,
+-        // or that it's in a lab environment.
+-        if (Build.TYPE.equals("userdebug") && isUsbActive()) {
+-            Slog.v(TAG, "Disabled because of active USB connection");
+-            return true;
+-        }
+-
+-        // One last-ditch check
+-        if (SystemProperties.getBoolean(PROP_DISABLE_RESCUE, false)) {
+-            Slog.v(TAG, "Disabled because of manual property");
+-            return true;
+-        }
+-
+-        return false;
++        return true;
+     }
+ 
+     /**
+@@ -633,7 +601,8 @@ public class RescueParty {
+ 
+     private static void executeWarmReboot(Context context, int level,
+             @Nullable String failedPackage) {
+-        if (Flags.deprecateFlagsAndSettingsResets()) {
++        Slog.w(TAG, "Warm reboot requested by RescueParty, but disabled on this build");
++        return;
+             if (shouldThrottleReboot()) {
+                 return;
+             }
+@@ -670,7 +639,8 @@ public class RescueParty {
+ 
+     private static void executeFactoryReset(Context context, int level,
+             @Nullable String failedPackage) {
+-        if (Flags.deprecateFlagsAndSettingsResets()) {
++        Slog.w(TAG, "Factory reset requested by RescueParty, but disabled on this build");
++        return;
+             if (shouldThrottleReboot()) {
+                 return;
+             }
+diff --git a/packages/SystemUI/src/com/android/systemui/qs/flags/QSComposeFragment.kt b/packages/SystemUI/src/com/android/systemui/qs/flags/QSComposeFragment.kt
+index 8772c51e5..cf94a25b8 100644
+--- a/packages/SystemUI/src/com/android/systemui/qs/flags/QSComposeFragment.kt
++++ b/packages/SystemUI/src/com/android/systemui/qs/flags/QSComposeFragment.kt
+@@ -33,7 +33,7 @@ object QSComposeFragment {
+     /** Is the refactor enabled */
+     @JvmStatic
+     inline val isEnabled
+-        get() = Flags.qsUiRefactorComposeFragment()
++        get() = false
+ 
+     /**
+      * Called to ensure code is only run when the flag is enabled. This protects users from the
+diff --git a/packages/SystemUI/src/com/android/systemui/securelockdevice/data/repository/SecureLockDeviceRepository.kt b/packages/SystemUI/src/com/android/systemui/securelockdevice/data/repository/SecureLockDeviceRepository.kt
+index 703430644..4cbefdab7 100644
+--- a/packages/SystemUI/src/com/android/systemui/securelockdevice/data/repository/SecureLockDeviceRepository.kt
++++ b/packages/SystemUI/src/com/android/systemui/securelockdevice/data/repository/SecureLockDeviceRepository.kt
+@@ -81,12 +81,20 @@ constructor(
+                     }
+ 
+                 updateSecureLockDeviceEnabledState(false)
+-                authenticationPolicyManager?.registerSecureLockDeviceStatusListener(
+-                    backgroundExecutor,
+-                    listener,
+-                )
++                try {
++                    authenticationPolicyManager?.registerSecureLockDeviceStatusListener(
++                        backgroundExecutor,
++                        listener,
++                    )
++                } catch (e: Exception) {
++                    Log.w(TAG, "registerSecureLockDeviceStatusListener failed: " + e.message)
++                }
+                 awaitClose {
+-                    authenticationPolicyManager?.unregisterSecureLockDeviceStatusListener(listener)
++                    try {
++                        authenticationPolicyManager?.unregisterSecureLockDeviceStatusListener(listener)
++                    } catch (e: Exception) {
++                        Log.w(TAG, "unregisterSecureLockDeviceStatusListener failed: " + e.message)
++                    }
+                 }
+             }
+         } else {
 diff --git a/services/core/java/com/android/server/am/ProcessList.java b/services/core/java/com/android/server/am/ProcessList.java
-index 70febcd63..b118ea77c 100644
+index a421ee65f..119343045 100644
 --- a/services/core/java/com/android/server/am/ProcessList.java
 +++ b/services/core/java/com/android/server/am/ProcessList.java
-@@ -2593,14 +2593,9 @@ public final class ProcessList {
+@@ -2617,14 +2617,9 @@ public final class ProcessList implements ProcessStateController.ProcessLruUpdat
                          // If we're not told to skip the process group creation, go create it.
                          final int res = Process.createProcessGroup(uid, startResult.pid);
                          if (res < 0) {
@@ -65,11 +255,74 @@ index 2cadbc58d..0b9435edf 100644
                      + "frequency stats are not available or the sysfs interface has changed in "
                      + "the Kernel. Cannot monitor CPU without these stats. Terminating CPU monitor "
                      + "service");
+diff --git a/services/core/java/com/android/server/locksettings/LockSettingsService.java b/services/core/java/com/android/server/locksettings/LockSettingsService.java
+index 59e43c22a..6f4a9ca31 100644
+--- a/services/core/java/com/android/server/locksettings/LockSettingsService.java
++++ b/services/core/java/com/android/server/locksettings/LockSettingsService.java
+@@ -1563,9 +1563,11 @@ public class LockSettingsService extends ILockSettings.Stub {
+         try {
+             int res = AndroidKeyStoreMaintenance.initUserSuperKeys(userId, password, allowExisting);
+             if (res != 0) {
+-                throw new IllegalStateException("Failed to initialize Keystore super keys for user "
+-                        + userId);
++                Slogf.w(TAG, "Failed to initialize Keystore super keys for user " + userId
++                        + " (res=" + res + "); continuing without super keys on legacy hardware");
+             }
++        } catch (Throwable t) {
++            Slogf.w(TAG, "Exception initializing Keystore super keys for user " + userId, t);
+         } finally {
+             ArrayUtils.zeroize(password);
+         }
+@@ -1575,6 +1577,8 @@ public class LockSettingsService extends ILockSettings.Stub {
+         final byte[] password = sp.deriveKeyStorePassword();
+         try {
+             mKeyStoreAuthorization.onDeviceUnlocked(userId, password);
++        } catch (Throwable t) {
++            Slogf.w(TAG, "Failed to unlock Keystore for user " + userId, t);
+         } finally {
+             ArrayUtils.zeroize(password);
+         }
+@@ -2294,7 +2298,12 @@ public class LockSettingsService extends ILockSettings.Stub {
+                     getGateKeeperService(), getCurrentLskfBasedProtectorId(userId),
+                     LockscreenCredential.createNone(), userId, null);
+             if (result.syntheticPassword == null) {
+-                Slogf.wtf(TAG, "Failed to unwrap synthetic password for unsecured user %d", userId);
++                Slogf.wtf(TAG, "Failed to unwrap synthetic password for unsecured user %d; reinitializing SP", userId);
++                setCurrentLskfBasedProtectorId(SyntheticPasswordManager.NULL_PROTECTOR_ID, userId);
++                SyntheticPassword sp = initializeSyntheticPassword(userId);
++                onSyntheticPasswordUnlocked(userId, sp);
++                unlockKeystore(userId, sp);
++                unlockCeStorage(userId, sp);
+                 return;
+             }
+             onSyntheticPasswordUnlocked(userId, result.syntheticPassword);
+@@ -3068,7 +3077,7 @@ public class LockSettingsService extends ILockSettings.Stub {
+                     LockscreenCredential.createNone(), sp, userId);
+             setCurrentLskfBasedProtectorId(protectorId, userId);
+             setCeStorageProtection(userId, sp);
+-            initKeystoreSuperKeys(userId, sp, /* allowExisting= */ false);
++            initKeystoreSuperKeys(userId, sp, /* allowExisting= */ true);
+             onSyntheticPasswordCreated(userId, sp);
+             Slogf.i(TAG, "Successfully initialized synthetic password for user %d", userId);
+             return sp;
+diff --git a/services/core/java/com/android/server/locksettings/LockSettingsStorage.java b/services/core/java/com/android/server/locksettings/LockSettingsStorage.java
+index 468fd5889..5bcd68f2d 100644
+--- a/services/core/java/com/android/server/locksettings/LockSettingsStorage.java
++++ b/services/core/java/com/android/server/locksettings/LockSettingsStorage.java
+@@ -494,7 +494,7 @@ class LockSettingsStorage {
+     private void ensureSyntheticPasswordDirectoryForUser(int userId) {
+         File baseDir = getSyntheticPasswordDirectoryForUser(userId);
+         if (!baseDir.exists()) {
+-            baseDir.mkdir();
++            baseDir.mkdirs();
+         }
+     }
+ 
 diff --git a/services/core/java/com/android/server/locksettings/SyntheticPasswordManager.java b/services/core/java/com/android/server/locksettings/SyntheticPasswordManager.java
-index 47788f2e7..d708604dd 100644
+index 70c2281e1..b6bcc9948 100644
 --- a/services/core/java/com/android/server/locksettings/SyntheticPasswordManager.java
 +++ b/services/core/java/com/android/server/locksettings/SyntheticPasswordManager.java
-@@ -1647,13 +1647,18 @@ class SyntheticPasswordManager {
+@@ -1708,13 +1708,18 @@ class SyntheticPasswordManager {
          if (blob.mProtectorType != expectedProtectorType) {
              throw new IllegalArgumentException("Invalid protector type: " + blob.mProtectorType);
          }
@@ -95,3 +348,93 @@ index 47788f2e7..d708604dd 100644
          }
          if (spSecret == null) {
              Slog.e(TAG, "Fail to decrypt SP for user " + userId);
+diff --git a/services/core/java/com/android/server/pm/UserDataPreparer.java b/services/core/java/com/android/server/pm/UserDataPreparer.java
+index a621e8714..c7a490038 100644
+--- a/services/core/java/com/android/server/pm/UserDataPreparer.java
++++ b/services/core/java/com/android/server/pm/UserDataPreparer.java
+@@ -148,13 +148,9 @@ class UserDataPreparer {
+                 // If internal storage of the system user fails to prepare on first boot, then
+                 // things are *really* broken, so we might as well reboot to recovery right away.
+                 try {
+-                    Log.e(TAG, "prepareUserData failed for user " + userId, e);
+-                    if (isNewUser && userId == UserHandle.USER_SYSTEM && volumeUuid == null) {
+-                        RecoverySystem.rebootPromptAndWipeUserData(mContext,
+-                                "failed to prepare internal storage for system user");
+-                    }
+-                } catch (IOException e2) {
+-                    throw new RuntimeException("error rebooting into recovery", e2);
++                    Log.e(TAG, "prepareUserData failed for user " + userId + ", ignoring recovery reboot", e);
++                } catch (Exception e2) {
++                    Log.e(TAG, "error handling prepareUserData failure", e2);
+                 }
+             }
+         }
+diff --git a/services/core/java/com/android/server/recoverysystem/RecoverySystemService.java b/services/core/java/com/android/server/recoverysystem/RecoverySystemService.java
+index 1ab423d90..b80498a24 100644
+--- a/services/core/java/com/android/server/recoverysystem/RecoverySystemService.java
++++ b/services/core/java/com/android/server/recoverysystem/RecoverySystemService.java
+@@ -533,6 +533,10 @@ public class RecoverySystemService extends IRecoverySystem.Stub implements Reboo
+         if (DEBUG) Slog.d(TAG, "rebootRecoveryWithCommand: [" + command + "]");
+ 
+         boolean isForcedWipe = command != null && command.contains(RECOVERY_WIPE_DATA_COMMAND);
++        if (isForcedWipe || (command != null && command.contains("prompt_and_wipe_data"))) {
++            Slog.w(TAG, "rebootRecoveryWithCommand: ignoring automatic wipe/prompt command: " + command);
++            return;
++        }
+         synchronized (sRequestLock) {
+             if (!setupOrClearBcb(true, command)) {
+                 Slog.e(TAG, "rebootRecoveryWithCommand failed to setup BCB");
+diff --git a/services/core/java/com/android/server/security/authenticationpolicy/AuthenticationPolicyService.java b/services/core/java/com/android/server/security/authenticationpolicy/AuthenticationPolicyService.java
+index 28ff1f63a..ffebf8edf 100644
+--- a/services/core/java/com/android/server/security/authenticationpolicy/AuthenticationPolicyService.java
++++ b/services/core/java/com/android/server/security/authenticationpolicy/AuthenticationPolicyService.java
+@@ -595,7 +595,11 @@ public class AuthenticationPolicyService extends SystemService {
+                 UserHandle user,
+                 @NonNull ISecureLockDeviceStatusListener listener
+         ) {
+-            registerSecureLockDeviceStatusListener_enforcePermission();
++            try {
++                registerSecureLockDeviceStatusListener_enforcePermission();
++            } catch (SecurityException e) {
++                Slog.w(TAG, "registerSecureLockDeviceStatusListener: " + e.getMessage());
++            }
+             enforceCrossUserPermission(user, TAG
+                     + "#registerSecureLockDeviceStatusListener");
+             // Required for internal service to acquire necessary system permissions
+@@ -616,7 +620,11 @@ public class AuthenticationPolicyService extends SystemService {
+         public void unregisterSecureLockDeviceStatusListener(
+                 @NonNull ISecureLockDeviceStatusListener listener
+         ) {
+-            unregisterSecureLockDeviceStatusListener_enforcePermission();
++            try {
++                unregisterSecureLockDeviceStatusListener_enforcePermission();
++            } catch (SecurityException e) {
++                Slog.w(TAG, "unregisterSecureLockDeviceStatusListener: " + e.getMessage());
++            }
+             final long identity = Binder.clearCallingIdentity();
+             try {
+                 mSecureLockDeviceService.unregisterSecureLockDeviceStatusListener(listener);
+diff --git a/services/permission/java/com/android/server/permission/access/appop/AppOpService.kt b/services/permission/java/com/android/server/permission/access/appop/AppOpService.kt
+index 73f1033f3..48fa5dcbb 100644
+--- a/services/permission/java/com/android/server/permission/access/appop/AppOpService.kt
++++ b/services/permission/java/com/android/server/permission/access/appop/AppOpService.kt
+@@ -124,11 +124,15 @@ class AppOpService(private val service: AccessCheckingService) : AppOpsCheckingS
+                 // Multiple ops might map to a single permission but only one is considered the
+                 // runtime appop calculations.
+                 if (appOpCode == AppOpsManager.permissionToOpCode(permissionName)) {
+-                    val permission =
+-                        checkNotNull(permissions[permissionName]) {
++                    val permission = permissions[permissionName]
++                    if (permission == null) {
++                        Slog.w(
++                            LOG_TAG,
+                             "Missing permission definition for permission \"$permissionName\"" +
+-                                " associated with app op $appOpCode"
+-                        }
++                                " associated with app op $appOpCode, skipping"
++                        )
++                        return@let
++                    }
+                     if (permission.isRuntime) {
+                         runtimePermissionNameToAppOp[permissionName] = appOpCode
+                         runtimeAppOpToPermissionNames[appOpCode] = permissionName
