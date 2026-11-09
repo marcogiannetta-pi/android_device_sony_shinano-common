@@ -179,10 +179,19 @@ index 8251fb4c9..b52b2de07 100644
                  return;
              }
 diff --git a/packages/SettingsLib/FooterPreference/res/values-v33/styles_preference_expressive.xml b/packages/SettingsLib/FooterPreference/res/values-v33/styles_preference_expressive.xml
-index 3dab2b014..a0a725974 100644
+index 3dab2b014..c54b7cd56 100644
 --- a/packages/SettingsLib/FooterPreference/res/values-v33/styles_preference_expressive.xml
 +++ b/packages/SettingsLib/FooterPreference/res/values-v33/styles_preference_expressive.xml
-@@ -26,6 +26,8 @@
+@@ -17,6 +17,8 @@
+ <resources xmlns:android="http://schemas.android.com/apk/res/android">
+     <style name="ThemeOverlay.ExpressiveFooterPreference" parent="">
+         <item name="expressiveFooterPreferenceTheme">@style/ExpressiveFooterPreferenceTheme</item>
++        <item name="expressivePreferenceIconFrameStyle">@style/ExpressiveFooterPreferenceIconFrameStyle</item>
++        <item name="expressivePreferenceIconStyle">@style/ExpressiveFooterPreferenceIconStyle</item>
+     </style>
+ 
+     <style name="ExpressiveFooterPreferenceTheme">
+@@ -26,6 +28,8 @@
          <item name="expressiveFooterPreferenceLinearLayoutStyle">@style/ExpressiveFooterPreferenceLinearLayoutStyle</item>
          <item name="expressiveFooterPreferenceTitleStyle">@style/ExpressiveFooterPreferenceTitleStyle</item>
          <item name="expressiveFooterPreferenceLearnMoreStyle">@style/ExpressiveFooterPreferenceLearnMoreStyle</item>
@@ -225,10 +234,10 @@ index 5f3e69e3b..4be29cb26 100644
      <!-- Preference should place its actual preference widget here. -->
      <LinearLayout
 diff --git a/packages/SettingsLib/SettingsTheme/res/layout-v36/settingslib_expressive_preference_icon_frame.xml b/packages/SettingsLib/SettingsTheme/res/layout-v36/settingslib_expressive_preference_icon_frame.xml
-index 947f5e00e..3324f09d3 100644
+index 947f5e00e..1a47b2edb 100644
 --- a/packages/SettingsLib/SettingsTheme/res/layout-v36/settingslib_expressive_preference_icon_frame.xml
 +++ b/packages/SettingsLib/SettingsTheme/res/layout-v36/settingslib_expressive_preference_icon_frame.xml
-@@ -18,6 +18,8 @@
+@@ -18,10 +18,14 @@
  <LinearLayout
      xmlns:android="http://schemas.android.com/apk/res/android"
      android:id="@+id/icon_frame"
@@ -237,11 +246,17 @@ index 947f5e00e..3324f09d3 100644
      android:filterTouchesWhenObscured="false"
      style="?expressivePreferenceIconFrameStyle">
  
+     <androidx.preference.internal.PreferenceImageView
+         android:id="@android:id/icon"
++        android:layout_width="wrap_content"
++        android:layout_height="wrap_content"
+         style="?expressivePreferenceIconStyle" />
+ </LinearLayout>
 diff --git a/packages/SettingsLib/SettingsTheme/res/layout/settingslib_expressive_preference_text_frame.xml b/packages/SettingsLib/SettingsTheme/res/layout/settingslib_expressive_preference_text_frame.xml
-index a987f69f6..658cf2530 100644
+index a987f69f6..df22c55ce 100644
 --- a/packages/SettingsLib/SettingsTheme/res/layout/settingslib_expressive_preference_text_frame.xml
 +++ b/packages/SettingsLib/SettingsTheme/res/layout/settingslib_expressive_preference_text_frame.xml
-@@ -17,6 +17,8 @@
+@@ -17,14 +17,20 @@
  
  <RelativeLayout
      xmlns:android="http://schemas.android.com/apk/res/android"
@@ -250,6 +265,18 @@ index a987f69f6..658cf2530 100644
      android:filterTouchesWhenObscured="false"
      style="?expressivePreferenceTextFrameStyle">
  
+     <TextView
+         android:id="@android:id/title"
++        android:layout_width="wrap_content"
++        android:layout_height="wrap_content"
+         style="?expressivePreferenceTextFrameTitleStyle" />
+ 
+     <TextView
+         android:id="@android:id/summary"
++        android:layout_width="wrap_content"
++        android:layout_height="wrap_content"
+         style="?expressivePreferenceTextFrameSummaryStyle" />
+ </RelativeLayout>
 diff --git a/packages/SystemUI/src/com/android/systemui/qs/flags/QSComposeFragment.kt b/packages/SystemUI/src/com/android/systemui/qs/flags/QSComposeFragment.kt
 index 8772c51e5..cf94a25b8 100644
 --- a/packages/SystemUI/src/com/android/systemui/qs/flags/QSComposeFragment.kt
