@@ -178,6 +178,78 @@ index 8251fb4c9..b52b2de07 100644
              if (shouldThrottleReboot()) {
                  return;
              }
+diff --git a/packages/SettingsLib/FooterPreference/res/values-v33/styles_preference_expressive.xml b/packages/SettingsLib/FooterPreference/res/values-v33/styles_preference_expressive.xml
+index 3dab2b014..a0a725974 100644
+--- a/packages/SettingsLib/FooterPreference/res/values-v33/styles_preference_expressive.xml
++++ b/packages/SettingsLib/FooterPreference/res/values-v33/styles_preference_expressive.xml
+@@ -26,6 +26,8 @@
+         <item name="expressiveFooterPreferenceLinearLayoutStyle">@style/ExpressiveFooterPreferenceLinearLayoutStyle</item>
+         <item name="expressiveFooterPreferenceTitleStyle">@style/ExpressiveFooterPreferenceTitleStyle</item>
+         <item name="expressiveFooterPreferenceLearnMoreStyle">@style/ExpressiveFooterPreferenceLearnMoreStyle</item>
++        <item name="expressivePreferenceIconFrameStyle">@style/ExpressiveFooterPreferenceIconFrameStyle</item>
++        <item name="expressivePreferenceIconStyle">@style/ExpressiveFooterPreferenceIconStyle</item>
+     </style>
+ 
+     <style name="ExpressiveFooterPreferenceRootLayoutStyle">
+diff --git a/packages/SettingsLib/MenuPreference/res/layout/settingslib_expressive_preference_ordermenu.xml b/packages/SettingsLib/MenuPreference/res/layout/settingslib_expressive_preference_ordermenu.xml
+index 5f3e69e3b..4be29cb26 100644
+--- a/packages/SettingsLib/MenuPreference/res/layout/settingslib_expressive_preference_ordermenu.xml
++++ b/packages/SettingsLib/MenuPreference/res/layout/settingslib_expressive_preference_ordermenu.xml
+@@ -26,13 +26,24 @@
+     android:background="?android:attr/selectableItemBackground"
+     android:clipToPadding="false"
+     android:baselineAligned="false"
+-    android:filterTouchesWhenObscured="false">
++    android:filterTouchesWhenObscured="false"
++    android:theme="?expressivePreferenceTheme">
+ 
+-    <include layout="@layout/settingslib_expressive_preference_number_frame"/>
++    <include
++        layout="@layout/settingslib_expressive_preference_number_frame"
++        android:layout_width="wrap_content"
++        android:layout_height="wrap_content"/>
+ 
+-    <include layout="@layout/settingslib_expressive_preference_icon_frame"/>
++    <include
++        layout="@layout/settingslib_expressive_preference_icon_frame"
++        android:layout_width="wrap_content"
++        android:layout_height="wrap_content"/>
+ 
+-    <include layout="@layout/settingslib_expressive_preference_text_frame"/>
++    <include
++        layout="@layout/settingslib_expressive_preference_text_frame"
++        android:layout_width="0dp"
++        android:layout_height="wrap_content"
++        android:layout_weight="1"/>
+ 
+     <!-- Preference should place its actual preference widget here. -->
+     <LinearLayout
+diff --git a/packages/SettingsLib/SettingsTheme/res/layout-v36/settingslib_expressive_preference_icon_frame.xml b/packages/SettingsLib/SettingsTheme/res/layout-v36/settingslib_expressive_preference_icon_frame.xml
+index 947f5e00e..3324f09d3 100644
+--- a/packages/SettingsLib/SettingsTheme/res/layout-v36/settingslib_expressive_preference_icon_frame.xml
++++ b/packages/SettingsLib/SettingsTheme/res/layout-v36/settingslib_expressive_preference_icon_frame.xml
+@@ -18,6 +18,8 @@
+ <LinearLayout
+     xmlns:android="http://schemas.android.com/apk/res/android"
+     android:id="@+id/icon_frame"
++    android:layout_width="wrap_content"
++    android:layout_height="wrap_content"
+     android:filterTouchesWhenObscured="false"
+     style="?expressivePreferenceIconFrameStyle">
+ 
+diff --git a/packages/SettingsLib/SettingsTheme/res/layout/settingslib_expressive_preference_text_frame.xml b/packages/SettingsLib/SettingsTheme/res/layout/settingslib_expressive_preference_text_frame.xml
+index a987f69f6..658cf2530 100644
+--- a/packages/SettingsLib/SettingsTheme/res/layout/settingslib_expressive_preference_text_frame.xml
++++ b/packages/SettingsLib/SettingsTheme/res/layout/settingslib_expressive_preference_text_frame.xml
+@@ -17,6 +17,8 @@
+ 
+ <RelativeLayout
+     xmlns:android="http://schemas.android.com/apk/res/android"
++    android:layout_width="wrap_content"
++    android:layout_height="wrap_content"
+     android:filterTouchesWhenObscured="false"
+     style="?expressivePreferenceTextFrameStyle">
+ 
 diff --git a/packages/SystemUI/src/com/android/systemui/qs/flags/QSComposeFragment.kt b/packages/SystemUI/src/com/android/systemui/qs/flags/QSComposeFragment.kt
 index 8772c51e5..cf94a25b8 100644
 --- a/packages/SystemUI/src/com/android/systemui/qs/flags/QSComposeFragment.kt
