@@ -1216,7 +1216,7 @@ index 819609e..ccd0888 100644
          }
  
 diff --git a/src/java/com/android/internal/telephony/RILUtils.java b/src/java/com/android/internal/telephony/RILUtils.java
-index 7179521..de07e0e 100644
+index 7179521..9e2fecd 100644
 --- a/src/java/com/android/internal/telephony/RILUtils.java
 +++ b/src/java/com/android/internal/telephony/RILUtils.java
 @@ -903,6 +903,36 @@ public class RILUtils {
@@ -1344,6 +1344,251 @@ index 7179521..de07e0e 100644
                  }
              }
          }
+@@ -5978,6 +6022,244 @@ public class RILUtils {
+         };
+     }
+ 
++    public static android.hardware.radio.V1_4.CardStatus convertV10CardStatusToV14(
++            android.hardware.radio.V1_0.CardStatus cs) {
++        android.hardware.radio.V1_4.CardStatus cs14 = new android.hardware.radio.V1_4.CardStatus();
++        cs14.base.base = cs;
++        cs14.base.physicalSlotId = 0;
++        cs14.base.atr = "";
++        cs14.base.iccid = "";
++        cs14.eid = "";
++        return cs14;
++    }
++
++    public static android.hardware.radio.V1_4.CardStatus convertV12CardStatusToV14(
++            android.hardware.radio.V1_2.CardStatus cs) {
++        android.hardware.radio.V1_4.CardStatus cs14 = new android.hardware.radio.V1_4.CardStatus();
++        cs14.base = cs;
++        cs14.eid = "";
++        return cs14;
++    }
++
++    public static ArrayList<android.hardware.radio.V1_2.Call> convertV10CallListToV12(
++            ArrayList<android.hardware.radio.V1_0.Call> calls) {
++        ArrayList<android.hardware.radio.V1_2.Call> out = new ArrayList<>(calls.size());
++        for (android.hardware.radio.V1_0.Call c : calls) {
++            android.hardware.radio.V1_2.Call c12 = new android.hardware.radio.V1_2.Call();
++            c12.base = c;
++            c12.audioQuality = android.hardware.radio.V1_2.AudioQuality.UNSPECIFIED;
++            out.add(c12);
++        }
++        return out;
++    }
++
++    public static android.hardware.radio.V1_4.SignalStrength convertV10SignalStrengthToV14(
++            android.hardware.radio.V1_0.SignalStrength ss) {
++        android.hardware.radio.V1_4.SignalStrength ss14 =
++                new android.hardware.radio.V1_4.SignalStrength();
++        ss14.gsm = ss.gw;
++        ss14.cdma = ss.cdma;
++        ss14.evdo = ss.evdo;
++        ss14.lte = ss.lte;
++        ss14.tdscdma.rscp = ss.tdScdma.rscp;
++        return ss14;
++    }
++
++    public static android.hardware.radio.V1_4.SignalStrength convertV12SignalStrengthToV14(
++            android.hardware.radio.V1_2.SignalStrength ss) {
++        android.hardware.radio.V1_4.SignalStrength ss14 =
++                new android.hardware.radio.V1_4.SignalStrength();
++        ss14.gsm = ss.gsm;
++        ss14.cdma = ss.cdma;
++        ss14.evdo = ss.evdo;
++        ss14.lte = ss.lte;
++        ss14.wcdma = ss.wcdma;
++        return ss14;
++    }
++
++    public static android.hardware.radio.V1_2.CellIdentity convertV10CellIdentityToV12(
++            android.hardware.radio.V1_0.CellIdentity ci) {
++        android.hardware.radio.V1_2.CellIdentity ci12 =
++                new android.hardware.radio.V1_2.CellIdentity();
++        ci12.cellInfoType = ci.cellInfoType;
++        for (android.hardware.radio.V1_0.CellIdentityGsm gsm : ci.cellIdentityGsm) {
++            android.hardware.radio.V1_2.CellIdentityGsm g12 =
++                    new android.hardware.radio.V1_2.CellIdentityGsm();
++            g12.base = gsm;
++            ci12.cellIdentityGsm.add(g12);
++        }
++        for (android.hardware.radio.V1_0.CellIdentityWcdma wcdma : ci.cellIdentityWcdma) {
++            android.hardware.radio.V1_2.CellIdentityWcdma w12 =
++                    new android.hardware.radio.V1_2.CellIdentityWcdma();
++            w12.base = wcdma;
++            ci12.cellIdentityWcdma.add(w12);
++        }
++        for (android.hardware.radio.V1_0.CellIdentityCdma cdma : ci.cellIdentityCdma) {
++            android.hardware.radio.V1_2.CellIdentityCdma c12 =
++                    new android.hardware.radio.V1_2.CellIdentityCdma();
++            c12.base = cdma;
++            ci12.cellIdentityCdma.add(c12);
++        }
++        for (android.hardware.radio.V1_0.CellIdentityLte lte : ci.cellIdentityLte) {
++            android.hardware.radio.V1_2.CellIdentityLte l12 =
++                    new android.hardware.radio.V1_2.CellIdentityLte();
++            l12.base = lte;
++            ci12.cellIdentityLte.add(l12);
++        }
++        for (android.hardware.radio.V1_0.CellIdentityTdscdma td : ci.cellIdentityTdscdma) {
++            android.hardware.radio.V1_2.CellIdentityTdscdma t12 =
++                    new android.hardware.radio.V1_2.CellIdentityTdscdma();
++            t12.base = td;
++            ci12.cellIdentityTdscdma.add(t12);
++        }
++        return ci12;
++    }
++
++    public static android.hardware.radio.V1_2.VoiceRegStateResult convertV10VoiceRegStateToV12(
++            android.hardware.radio.V1_0.VoiceRegStateResult v) {
++        android.hardware.radio.V1_2.VoiceRegStateResult v12 =
++                new android.hardware.radio.V1_2.VoiceRegStateResult();
++        v12.regState = v.regState;
++        v12.rat = v.rat;
++        v12.cssSupported = v.cssSupported;
++        v12.roamingIndicator = v.roamingIndicator;
++        v12.systemIsInPrl = v.systemIsInPrl;
++        v12.defaultRoamingIndicator = v.defaultRoamingIndicator;
++        v12.reasonForDenial = v.reasonForDenial;
++        v12.cellIdentity = convertV10CellIdentityToV12(v.cellIdentity);
++        return v12;
++    }
++
++    public static android.hardware.radio.V1_4.DataRegStateResult convertV12DataRegStateToV14(
++            android.hardware.radio.V1_2.DataRegStateResult d) {
++        android.hardware.radio.V1_4.DataRegStateResult d14 =
++                new android.hardware.radio.V1_4.DataRegStateResult();
++        d14.base = d;
++        return d14;
++    }
++
++    public static android.hardware.radio.V1_4.DataRegStateResult convertV10DataRegStateToV14(
++            android.hardware.radio.V1_0.DataRegStateResult d) {
++        android.hardware.radio.V1_2.DataRegStateResult d12 =
++                new android.hardware.radio.V1_2.DataRegStateResult();
++        d12.regState = d.regState;
++        d12.rat = d.rat;
++        d12.reasonDataDenied = d.reasonDataDenied;
++        d12.maxDataCalls = d.maxDataCalls;
++        d12.cellIdentity = convertV10CellIdentityToV12(d.cellIdentity);
++        return convertV12DataRegStateToV14(d12);
++    }
++
++    public static android.hardware.radio.V1_4.SetupDataCallResult convertV10SetupDataCallResultToV14(
++            android.hardware.radio.V1_0.SetupDataCallResult r) {
++        android.hardware.radio.V1_4.SetupDataCallResult r14 =
++                new android.hardware.radio.V1_4.SetupDataCallResult();
++        r14.cause = r.status;
++        r14.suggestedRetryTime = r.suggestedRetryTime;
++        r14.cid = r.cid;
++        r14.active = r.active;
++        r14.type = convertToHalPdpType(r.type);
++        r14.ifname = r.ifname;
++        if (!TextUtils.isEmpty(r.addresses)) r14.addresses.add(r.addresses);
++        if (!TextUtils.isEmpty(r.dnses)) r14.dnses.add(r.dnses);
++        if (!TextUtils.isEmpty(r.gateways)) r14.gateways.add(r.gateways);
++        if (!TextUtils.isEmpty(r.pcscf)) r14.pcscf.add(r.pcscf);
++        r14.mtu = r.mtu;
++        return r14;
++    }
++
++    public static ArrayList<android.hardware.radio.V1_4.SetupDataCallResult>
++            convertV10SetupDataCallResultListToV14(
++                    ArrayList<android.hardware.radio.V1_0.SetupDataCallResult> list) {
++        ArrayList<android.hardware.radio.V1_4.SetupDataCallResult> out =
++                new ArrayList<>(list.size());
++        for (android.hardware.radio.V1_0.SetupDataCallResult r : list) {
++            out.add(convertV10SetupDataCallResultToV14(r));
++        }
++        return out;
++    }
++
++    private static int convertToHalPdpType(String type) {
++        if ("IP".equals(type)) return android.hardware.radio.V1_4.PdpProtocolType.IP;
++        if ("IPV6".equals(type)) return android.hardware.radio.V1_4.PdpProtocolType.IPV6;
++        if ("IPV4V6".equals(type)) return android.hardware.radio.V1_4.PdpProtocolType.IPV4V6;
++        if ("PPP".equals(type)) return android.hardware.radio.V1_4.PdpProtocolType.PPP;
++        return android.hardware.radio.V1_4.PdpProtocolType.UNKNOWN;
++    }
++
++    public static ArrayList<android.hardware.radio.V1_4.CellInfo> convertV12CellInfoListToV14(
++            ArrayList<android.hardware.radio.V1_2.CellInfo> records) {
++        ArrayList<android.hardware.radio.V1_4.CellInfo> out = new ArrayList<>(records.size());
++        for (android.hardware.radio.V1_2.CellInfo ci : records) {
++            android.hardware.radio.V1_4.CellInfo c14 = new android.hardware.radio.V1_4.CellInfo();
++            c14.isRegistered = ci.registered;
++            c14.connectionStatus = ci.connectionStatus;
++            if (!ci.gsm.isEmpty()) c14.info.gsm(ci.gsm.get(0));
++            else if (!ci.cdma.isEmpty()) c14.info.cdma(ci.cdma.get(0));
++            else if (!ci.wcdma.isEmpty()) c14.info.wcdma(ci.wcdma.get(0));
++            else if (!ci.tdscdma.isEmpty()) c14.info.tdscdma(ci.tdscdma.get(0));
++            else if (!ci.lte.isEmpty()) {
++                android.hardware.radio.V1_4.CellInfoLte l14 =
++                        new android.hardware.radio.V1_4.CellInfoLte();
++                l14.base = ci.lte.get(0);
++                c14.info.lte(l14);
++            }
++            out.add(c14);
++        }
++        return out;
++    }
++
++    public static ArrayList<android.hardware.radio.V1_4.CellInfo> convertV10CellInfoListToV14(
++            ArrayList<android.hardware.radio.V1_0.CellInfo> records) {
++        ArrayList<android.hardware.radio.V1_2.CellInfo> out12 = new ArrayList<>(records.size());
++        for (android.hardware.radio.V1_0.CellInfo ci : records) {
++            android.hardware.radio.V1_2.CellInfo c12 = new android.hardware.radio.V1_2.CellInfo();
++            c12.cellInfoType = ci.cellInfoType;
++            c12.registered = ci.registered;
++            c12.timeStampType = ci.timeStampType;
++            c12.timeStamp = ci.timeStamp;
++            c12.connectionStatus = android.hardware.radio.V1_2.CellConnectionStatus.NONE;
++            for (android.hardware.radio.V1_0.CellInfoGsm g : ci.gsm) {
++                android.hardware.radio.V1_2.CellInfoGsm g12 =
++                        new android.hardware.radio.V1_2.CellInfoGsm();
++                g12.cellIdentityGsm.base = g.cellIdentityGsm;
++                g12.signalStrengthGsm = g.signalStrengthGsm;
++                c12.gsm.add(g12);
++            }
++            for (android.hardware.radio.V1_0.CellInfoCdma c : ci.cdma) {
++                android.hardware.radio.V1_2.CellInfoCdma cd12 =
++                        new android.hardware.radio.V1_2.CellInfoCdma();
++                cd12.cellIdentityCdma.base = c.cellIdentityCdma;
++                cd12.signalStrengthCdma = c.signalStrengthCdma;
++                cd12.signalStrengthEvdo = c.signalStrengthEvdo;
++                c12.cdma.add(cd12);
++            }
++            for (android.hardware.radio.V1_0.CellInfoWcdma w : ci.wcdma) {
++                android.hardware.radio.V1_2.CellInfoWcdma w12 =
++                        new android.hardware.radio.V1_2.CellInfoWcdma();
++                w12.cellIdentityWcdma.base = w.cellIdentityWcdma;
++                w12.signalStrengthWcdma.base = w.signalStrengthWcdma;
++                c12.wcdma.add(w12);
++            }
++            for (android.hardware.radio.V1_0.CellInfoLte l : ci.lte) {
++                android.hardware.radio.V1_2.CellInfoLte l12 =
++                        new android.hardware.radio.V1_2.CellInfoLte();
++                l12.cellIdentityLte.base = l.cellIdentityLte;
++                l12.signalStrengthLte = l.signalStrengthLte;
++                c12.lte.add(l12);
++            }
++            for (android.hardware.radio.V1_0.CellInfoTdscdma t : ci.tdscdma) {
++                android.hardware.radio.V1_2.CellInfoTdscdma t12 =
++                        new android.hardware.radio.V1_2.CellInfoTdscdma();
++                t12.cellIdentityTdscdma.base = t.cellIdentityTdscdma;
++                t12.signalStrengthTdscdma.rscp = t.signalStrengthTdscdma.rscp;
++                c12.tdscdma.add(t12);
++            }
++            out12.add(c12);
++        }
++        return convertV12CellInfoListToV14(out12);
++    }
++
+     private static void logd(String log) {
+         Rlog.d("RILUtils", log);
+     }
 diff --git a/src/java/com/android/internal/telephony/RadioConfig.java b/src/java/com/android/internal/telephony/RadioConfig.java
 index 016978d..185cec2 100644
 --- a/src/java/com/android/internal/telephony/RadioConfig.java
@@ -1457,6 +1702,82 @@ index 2b0c90c..2db8865 100644
          }
      }
  
+diff --git a/src/java/com/android/internal/telephony/RadioIndication.java b/src/java/com/android/internal/telephony/RadioIndication.java
+index 32782dc..21b0b7e 100644
+--- a/src/java/com/android/internal/telephony/RadioIndication.java
++++ b/src/java/com/android/internal/telephony/RadioIndication.java
+@@ -228,7 +228,8 @@ public class RadioIndication extends IRadioIndication.Stub {
+ 
+     public void currentSignalStrength(int indicationType,
+             android.hardware.radio.V1_0.SignalStrength signalStrength) {
+-        mRil.unsljLogMore(RIL_UNSOL_SIGNAL_STRENGTH, "unsupported on IRadio < 1.4");
++        currentSignalStrength_1_4(indicationType,
++                RILUtils.convertV10SignalStrengthToV14(signalStrength));
+     }
+ 
+     /**
+@@ -268,7 +269,8 @@ public class RadioIndication extends IRadioIndication.Stub {
+      */
+     public void currentSignalStrength_1_2(int indicationType,
+             android.hardware.radio.V1_2.SignalStrength signalStrength) {
+-        mRil.unsljLogMore(RIL_UNSOL_SIGNAL_STRENGTH, "unsupported on IRadio < 1.4");
++        currentSignalStrength_1_4(indicationType,
++                RILUtils.convertV12SignalStrengthToV14(signalStrength));
+     }
+ 
+     /**
+@@ -361,7 +363,8 @@ public class RadioIndication extends IRadioIndication.Stub {
+     /** Indicates current data call list. */
+     public void dataCallListChanged(int indicationType,
+             ArrayList<android.hardware.radio.V1_0.SetupDataCallResult> dcList) {
+-        mRil.unsljLogMore(RIL_UNSOL_DATA_CALL_LIST_CHANGED, "unsupported on IRadio < 1.4");
++        dataCallListChanged_1_4(indicationType,
++                RILUtils.convertV10SetupDataCallResultListToV14(dcList));
+     }
+ 
+     /** Indicates current data call list with radio HAL 1.4. */
+@@ -618,13 +621,13 @@ public class RadioIndication extends IRadioIndication.Stub {
+     /** Get unsolicited message for cellInfoList */
+     public void cellInfoList(int indicationType,
+             ArrayList<android.hardware.radio.V1_0.CellInfo> records) {
+-        mRil.unsljLogMore(RIL_UNSOL_CELL_INFO_LIST, "unsupported on IRadio < 1.4");
++        cellInfoList_1_4(indicationType, RILUtils.convertV10CellInfoListToV14(records));
+     }
+ 
+     /** Get unsolicited message for cellInfoList using HAL V1_2 */
+     public void cellInfoList_1_2(int indicationType,
+             ArrayList<android.hardware.radio.V1_2.CellInfo> records) {
+-        mRil.unsljLogMore(RIL_UNSOL_CELL_INFO_LIST, "unsupported on IRadio < 1.4");
++        cellInfoList_1_4(indicationType, RILUtils.convertV12CellInfoListToV14(records));
+     }
+ 
+     /** Get unsolicited message for cellInfoList using HAL V1_4 */
+@@ -668,13 +671,23 @@ public class RadioIndication extends IRadioIndication.Stub {
+     /** Incremental network scan results */
+     public void networkScanResult(int indicationType,
+             android.hardware.radio.V1_1.NetworkScanResult result) {
+-        mRil.unsljLogMore(RIL_UNSOL_NETWORK_SCAN_RESULT, "unsupported on IRadio < 1.4");
++        android.hardware.radio.V1_4.NetworkScanResult res14 =
++                new android.hardware.radio.V1_4.NetworkScanResult();
++        res14.status = result.status;
++        res14.error = result.error;
++        res14.networkInfos = RILUtils.convertV10CellInfoListToV14(result.networkInfos);
++        networkScanResult_1_4(indicationType, res14);
+     }
+ 
+     /** Incremental network scan results with HAL V1_2 */
+     public void networkScanResult_1_2(int indicationType,
+             android.hardware.radio.V1_2.NetworkScanResult result) {
+-        mRil.unsljLogMore(RIL_UNSOL_NETWORK_SCAN_RESULT, "unsupported on IRadio < 1.4");
++        android.hardware.radio.V1_4.NetworkScanResult res14 =
++                new android.hardware.radio.V1_4.NetworkScanResult();
++        res14.status = result.status;
++        res14.error = result.error;
++        res14.networkInfos = RILUtils.convertV12CellInfoListToV14(result.networkInfos);
++        networkScanResult_1_4(indicationType, res14);
+     }
+ 
+     /** Incremental network scan results with HAL V1_4 */
 diff --git a/src/java/com/android/internal/telephony/RadioModemProxy.java b/src/java/com/android/internal/telephony/RadioModemProxy.java
 index 7b8eb79..133a8b9 100644
 --- a/src/java/com/android/internal/telephony/RadioModemProxy.java
@@ -1652,10 +1973,185 @@ index c2c7d74..ceab311 100644
      }
  
 diff --git a/src/java/com/android/internal/telephony/RadioResponse.java b/src/java/com/android/internal/telephony/RadioResponse.java
-index ada45ec..c384720 100644
+index ada45ec..d1685b5 100644
 --- a/src/java/com/android/internal/telephony/RadioResponse.java
 +++ b/src/java/com/android/internal/telephony/RadioResponse.java
-@@ -1855,7 +1855,7 @@ public class RadioResponse extends IRadioResponse.Stub {
+@@ -101,7 +101,7 @@ public class RadioResponse extends IRadioResponse.Stub {
+      * @param cardStatus ICC card status as defined by CardStatus in types.hal
+      */
+     public void getIccCardStatusResponse(RadioResponseInfo responseInfo, CardStatus cardStatus) {
+-        responseNotSupported(responseInfo);
++        responseIccCardStatus(responseInfo, RILUtils.convertV10CardStatusToV14(cardStatus));
+     }
+ 
+     /**
+@@ -110,7 +110,7 @@ public class RadioResponse extends IRadioResponse.Stub {
+      */
+     public void getIccCardStatusResponse_1_2(RadioResponseInfo responseInfo,
+             android.hardware.radio.V1_2.CardStatus cardStatus) {
+-        responseNotSupported(responseInfo);
++        responseIccCardStatus(responseInfo, RILUtils.convertV12CardStatusToV14(cardStatus));
+     }
+ 
+     /**
+@@ -206,7 +206,7 @@ public class RadioResponse extends IRadioResponse.Stub {
+      */
+     public void getCurrentCallsResponse(RadioResponseInfo responseInfo,
+             ArrayList<android.hardware.radio.V1_0.Call> calls) {
+-        responseNotSupported(responseInfo);
++        responseCurrentCalls(responseInfo, RILUtils.convertV10CallListToV12(calls));
+     }
+ 
+     /**
+@@ -299,7 +299,7 @@ public class RadioResponse extends IRadioResponse.Stub {
+ 
+     public void getSignalStrengthResponse(RadioResponseInfo responseInfo,
+             android.hardware.radio.V1_0.SignalStrength sigStrength) {
+-        responseNotSupported(responseInfo);
++        responseSignalStrength(responseInfo, RILUtils.convertV10SignalStrengthToV14(sigStrength));
+     }
+ 
+     /**
+@@ -308,7 +308,8 @@ public class RadioResponse extends IRadioResponse.Stub {
+      */
+     public void getSignalStrengthResponse_1_2(RadioResponseInfo responseInfo,
+             android.hardware.radio.V1_2.SignalStrength signalStrength) {
+-        responseNotSupported(responseInfo);
++        responseSignalStrength(responseInfo,
++                RILUtils.convertV12SignalStrengthToV14(signalStrength));
+     }
+ 
+     /**
+@@ -337,7 +338,8 @@ public class RadioResponse extends IRadioResponse.Stub {
+      */
+     public void getVoiceRegistrationStateResponse(RadioResponseInfo responseInfo,
+             VoiceRegStateResult voiceRegResponse) {
+-        responseNotSupported(responseInfo);
++        getVoiceRegistrationStateResponse_1_2(responseInfo,
++                RILUtils.convertV10VoiceRegStateToV12(voiceRegResponse));
+     }
+ 
+     /**
+@@ -411,7 +413,8 @@ public class RadioResponse extends IRadioResponse.Stub {
+      */
+     public void getDataRegistrationStateResponse(RadioResponseInfo responseInfo,
+             DataRegStateResult dataRegResponse) {
+-        responseNotSupported(responseInfo);
++        getDataRegistrationStateResponse_1_4(responseInfo,
++                RILUtils.convertV10DataRegStateToV14(dataRegResponse));
+     }
+ 
+     /**
+@@ -421,7 +424,8 @@ public class RadioResponse extends IRadioResponse.Stub {
+      */
+     public void getDataRegistrationStateResponse_1_2(RadioResponseInfo responseInfo,
+             android.hardware.radio.V1_2.DataRegStateResult dataRegResponse) {
+-        responseNotSupported(responseInfo);
++        getDataRegistrationStateResponse_1_4(responseInfo,
++                RILUtils.convertV12DataRegStateToV14(dataRegResponse));
+     }
+ 
+     /**
+@@ -559,7 +563,8 @@ public class RadioResponse extends IRadioResponse.Stub {
+      */
+     public void setupDataCallResponse(RadioResponseInfo responseInfo,
+             android.hardware.radio.V1_0.SetupDataCallResult setupDataCallResult) {
+-        responseNotSupported(responseInfo);
++        responseSetupDataCall(responseInfo,
++                RILUtils.convertV10SetupDataCallResultToV14(setupDataCallResult));
+     }
+ 
+     /**
+@@ -787,7 +792,7 @@ public class RadioResponse extends IRadioResponse.Stub {
+      * @param responseInfo Response info struct containing response type, serial no. and error
+      */
+     public void startNetworkScanResponse(RadioResponseInfo responseInfo) {
+-        responseNotSupported(responseInfo);
++        responseVoid(responseInfo);
+     }
+ 
+     /**
+@@ -875,7 +880,8 @@ public class RadioResponse extends IRadioResponse.Stub {
+      */
+     public void getDataCallListResponse(RadioResponseInfo responseInfo,
+             ArrayList<android.hardware.radio.V1_0.SetupDataCallResult> dataCallResultList) {
+-        responseNotSupported(responseInfo);
++        responseDataCallList(responseInfo,
++                RILUtils.convertV10SetupDataCallResultListToV14(dataCallResultList));
+     }
+ 
+     /**
+@@ -970,7 +976,7 @@ public class RadioResponse extends IRadioResponse.Stub {
+      * @param responseInfo Response info struct containing response type, serial no. and error
+      */
+     public void setPreferredNetworkTypeResponse(RadioResponseInfo responseInfo) {
+-        responseNotSupported(responseInfo);
++        responseVoid(responseInfo);
+     }
+ 
+     /**
+@@ -986,7 +992,9 @@ public class RadioResponse extends IRadioResponse.Stub {
+      * @param nwType RadioPreferredNetworkType defined in types.hal
+      */
+     public void getPreferredNetworkTypeResponse(RadioResponseInfo responseInfo, int nwType) {
+-        responseNotSupported(responseInfo);
++        int raf = android.telephony.RadioAccessFamily.getRafFromNetworkType(nwType);
++        mRil.mAllowedNetworkTypesBitmask = raf;
++        responseInts(responseInfo, raf);
+     }
+ 
+     /**
+@@ -1305,7 +1313,7 @@ public class RadioResponse extends IRadioResponse.Stub {
+ 
+     public void getCellInfoListResponse(RadioResponseInfo responseInfo,
+             ArrayList<android.hardware.radio.V1_0.CellInfo> cellInfo) {
+-        responseNotSupported(responseInfo);
++        responseCellInfoList(responseInfo, RILUtils.convertV10CellInfoListToV14(cellInfo));
+     }
+ 
+     /**
+@@ -1314,7 +1322,7 @@ public class RadioResponse extends IRadioResponse.Stub {
+      */
+     public void getCellInfoListResponse_1_2(RadioResponseInfo responseInfo,
+             ArrayList<android.hardware.radio.V1_2.CellInfo> cellInfo) {
+-        responseNotSupported(responseInfo);
++        responseCellInfoList(responseInfo, RILUtils.convertV12CellInfoListToV14(cellInfo));
+     }
+ 
+     /**
+@@ -1605,7 +1613,7 @@ public class RadioResponse extends IRadioResponse.Stub {
+      *        if Length of allowed carriers list is 0, numAllowed = 0.
+      */
+     public void setAllowedCarriersResponse(RadioResponseInfo responseInfo, int numAllowed) {
+-        responseNotSupported(responseInfo);
++        setAllowedCarriersResponse_1_4(responseInfo);
+     }
+ 
+     /**
+@@ -1633,7 +1641,12 @@ public class RadioResponse extends IRadioResponse.Stub {
+      */
+     public void getAllowedCarriersResponse(RadioResponseInfo responseInfo, boolean allAllowed,
+             CarrierRestrictions carriers) {
+-        responseNotSupported(responseInfo);
++        CarrierRestrictionsWithPriority cr = new CarrierRestrictionsWithPriority();
++        cr.allowedCarriers = carriers.allowedCarriers;
++        cr.excludedCarriers = carriers.excludedCarriers;
++        cr.allowedCarriersPrioritized = !allAllowed;
++        getAllowedCarriersResponse_1_4(responseInfo, cr,
++                SimLockMultiSimPolicy.NO_MULTISIM_POLICY);
+     }
+ 
+     /**
+@@ -1706,7 +1719,7 @@ public class RadioResponse extends IRadioResponse.Stub {
+      * @param responseInfo Response info struct containing response type, serial no. and error
+      */
+     public void setSimCardPowerResponse(RadioResponseInfo responseInfo) {
+-        responseNotSupported(responseInfo);
++        responseVoid(responseInfo);
+     }
+ 
+     /**
+@@ -1855,7 +1868,7 @@ public class RadioResponse extends IRadioResponse.Stub {
              slotPortMapping.mPhysicalSlotIndex = cardStatus.base.physicalSlotId;
              iccCardStatus.mSlotPortMapping = slotPortMapping;
              iccCardStatus.atr = cardStatus.base.atr;
