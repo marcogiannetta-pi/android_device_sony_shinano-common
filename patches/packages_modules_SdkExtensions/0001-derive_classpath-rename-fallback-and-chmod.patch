@@ -1,0 +1,31 @@
+diff --git a/derive_classpath/derive_classpath.cpp b/derive_classpath/derive_classpath.cpp
+index 1de47a7..1ce17ea 100644
+--- a/derive_classpath/derive_classpath.cpp
++++ b/derive_classpath/derive_classpath.cpp
+@@ -164,14 +164,21 @@ bool WriteClasspathExports(Classpaths classpaths, std::string_view output_path)
+ 
+   const std::string path_str(output_path);
+   if (android::base::StartsWith(path_str, "/data/")) {
+-    // When writing to /data, write to a temp file first to make sure the partition is not full.
+     const std::string temp_str(path_str + ".tmp");
+-    if (!android::base::WriteStringToFile(content, temp_str, /*follow_symlinks=*/true)) {
+-      return false;
++    android::base::WriteStringToFile(content, temp_str, /*follow_symlinks=*/true);
++    if (rename(temp_str.c_str(), path_str.c_str()) != 0) {
++      PLOG(WARNING) << "rename " << temp_str << " to " << path_str << " failed, writing directly";
++      if (!android::base::WriteStringToFile(content, path_str, /*follow_symlinks=*/true)) {
++        PLOG(ERROR) << "Failed to write directly to " << path_str;
++        return false;
++      }
+     }
+-    return rename(temp_str.c_str(), path_str.c_str()) == 0;
++    chmod(path_str.c_str(), 0644);
++    return true;
+   } else {
+-    return android::base::WriteStringToFile(content, path_str, /*follow_symlinks=*/true);
++    bool ok = android::base::WriteStringToFile(content, path_str, /*follow_symlinks=*/true);
++    chmod(path_str.c_str(), 0644);
++    return ok;
+   }
+ }
+ 

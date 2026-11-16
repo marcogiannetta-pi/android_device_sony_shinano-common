@@ -1,0 +1,28 @@
+diff --git a/DnsProxyListener.cpp b/DnsProxyListener.cpp
+index 04c5921..feb8159 100644
+--- a/DnsProxyListener.cpp
++++ b/DnsProxyListener.cpp
+@@ -690,8 +690,8 @@ IsUidBlockedFn resolveIsUidNetworkingBlockedFn() {
+     }
+     const int ret = (*ADnsHelper_init)();
+     if (ret) {
+-        LOG(ERROR) << __func__ << ": ADnsHelper_init failed " << strerror(-ret);
+-        abort();
++        LOG(WARNING) << __func__ << ": ADnsHelper_init failed " << strerror(-ret) << ", skipping UID networking blocking";
++        return nullptr;
+     }
+ 
+     IsUidBlockedFn f =
+@@ -951,7 +951,11 @@ void DnsProxyListener::GetAddrInfoHandler::run() {
+         success = !mClient->sendCode(ResponseCode::DnsProxyQueryResult);
+         addrinfo* ai = result;
+         while (ai && success) {
+-            success = sendBE32(mClient, 1) && sendaddrinfo(mClient, ai);
++            if (ai->ai_addr && ai->ai_addrlen > 0 &&
++                (ai->ai_family == AF_INET || ai->ai_family == AF_INET6) &&
++                ai->ai_addr->sa_family == ai->ai_family) {
++                success = sendBE32(mClient, 1) && sendaddrinfo(mClient, ai);
++            }
+             ai = ai->ai_next;
+         }
+         success = success && sendBE32(mClient, 0);

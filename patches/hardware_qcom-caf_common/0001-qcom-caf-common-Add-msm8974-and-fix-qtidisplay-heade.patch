@@ -1,0 +1,27 @@
+diff --git a/BoardConfigQcom.mk b/BoardConfigQcom.mk
+index 4aa2d01..7f3e321 100644
+--- a/BoardConfigQcom.mk
++++ b/BoardConfigQcom.mk
+@@ -359,7 +359,7 @@ ifneq ($(filter $(QSSI_SUPPORTED_PLATFORMS),$(TARGET_BOARD_PLATFORM)),)
+             vendor/qcom/opensource/display
+     endif
+     $(call soong_config_set,qtidisplay,headers_namespace,vendor/qcom/opensource/commonsys-intf/display)
+-else
++else ifneq ($(filter $(UM_PLATFORMS),$(TARGET_BOARD_PLATFORM)),)
+     $(call soong_config_set,qtidisplay,headers_namespace,$(QCOM_SOONG_NAMESPACE)/display)
+ endif
+ 
+diff --git a/qcom_boards.mk b/qcom_boards.mk
+index 62ae73d..1cc137a 100644
+--- a/qcom_boards.mk
++++ b/qcom_boards.mk
+@@ -1,6 +1,9 @@
+ # Board platforms lists to be used for
+ # TARGET_BOARD_PLATFORM specific featurization
+ 
++# Legacy MSM8974
++QCOM_BOARD_PLATFORMS += msm8974
++
+ # UM 3.18
+ QCOM_BOARD_PLATFORMS += msm8937
+ QCOM_BOARD_PLATFORMS += msm8953
