@@ -1,5 +1,5 @@
 diff --git a/libs/binder/ProcessState.cpp b/libs/binder/ProcessState.cpp
-index f7d5347..8e82933 100644
+index dd4444b..0a38e36 100644
 --- a/libs/binder/ProcessState.cpp
 +++ b/libs/binder/ProcessState.cpp
 @@ -449,8 +449,10 @@ void ProcessState::spawnPooledThread(bool isMain)
@@ -16,7 +16,7 @@ index f7d5347..8e82933 100644
      if (ioctl(mDriverFD, BINDER_SET_MAX_THREADS, &maxThreads) != -1) {
          mMaxThreads = maxThreads;
 diff --git a/libs/input/KeyLayoutMap.cpp b/libs/input/KeyLayoutMap.cpp
-index f3241c9..d93a4da 100644
+index 46bf5fc..e09fffe 100644
 --- a/libs/input/KeyLayoutMap.cpp
 +++ b/libs/input/KeyLayoutMap.cpp
 @@ -103,7 +103,10 @@ bool kernelConfigsArePresent(const std::set<std::string>& configs) {
@@ -32,21 +32,21 @@ index f3241c9..d93a4da 100644
      for (const std::string& requiredConfig : configs) {
          const auto configIt = kernelConfigs.find(requiredConfig);
 diff --git a/libs/renderengine/skia/SkiaRenderEngine.cpp b/libs/renderengine/skia/SkiaRenderEngine.cpp
-index daa0ecc..ee6c2f0 100644
+index c4b5c1f..e8a1c9c 100644
 --- a/libs/renderengine/skia/SkiaRenderEngine.cpp
 +++ b/libs/renderengine/skia/SkiaRenderEngine.cpp
-@@ -1185,6 +1185,10 @@ void SkiaRenderEngine::drawLayersInternal(
-                     : item.usePremultipliedAlpha         ? kPremul_SkAlphaType
-                                                          : kUnpremul_SkAlphaType;
-             sk_sp<SkImage> image = imageTextureRef->makeImage(layerDataspace, alphaType);
+@@ -1411,6 +1411,10 @@ void SkiaRenderEngine::drawLayersInternal(
+                                                               : kUnpremul_SkAlphaType;
+             sk_sp<SkImage> image =
+                     imageTextureRef->makeImage(layerDataspace, alphaType, colorSpaceOptions);
 +            if (!image) {
 +                ALOGE("makeImage failed for layer, skipping");
 +                continue;
 +            }
- 
-             auto texMatrix = getSkM44(item.textureTransform).asM33();
-             // textureTansform was intended to be passed directly into a shader, so when
-@@ -1398,6 +1402,11 @@ void SkiaRenderEngine::tonemapAndDrawGainmapInternal(
+             // If the image could not be created in such a way to respect item.isOpaque, then we
+             // need to use a workaround where we treat the image as premultiplied and apply
+             // SkBlendMode::kPlus with opaque black.
+@@ -1689,6 +1693,11 @@ void SkiaRenderEngine::tonemapAndDrawGainmapInternal(
      waitFence(context, hdrFence);
      const auto hdrTextureRef = getOrCreateBackendTexture(hdr->getBuffer(), false);
      const auto hdrImage = hdrTextureRef->makeImage(dataspace, kPremul_SkAlphaType);
@@ -59,92 +59,72 @@ index daa0ecc..ee6c2f0 100644
              hdrImage->makeShader(SkTileMode::kClamp, SkTileMode::kClamp,
                                   SkSamplingOptions({SkFilterMode::kNearest, SkMipmapMode::kNone}),
 diff --git a/libs/renderengine/skia/compat/GaneshBackendTexture.cpp b/libs/renderengine/skia/compat/GaneshBackendTexture.cpp
-index d4a075d..f60c696 100644
+index 2927437..52e0b96 100644
 --- a/libs/renderengine/skia/compat/GaneshBackendTexture.cpp
 +++ b/libs/renderengine/skia/compat/GaneshBackendTexture.cpp
-@@ -94,6 +94,24 @@ sk_sp<SkImage> GaneshBackendTexture::makeImage(SkAlphaType alphaType, ui::Datasp
+@@ -71,11 +71,11 @@ GaneshBackendTexture::GaneshBackendTexture(sk_sp<GrDirectContext> grContext,
+                                                                  &mImageCtx, createProtectedImage,
+                                                                  backendFormat, isOutputBuffer);
+     } else {
+-        LOG_ALWAYS_FATAL("Unexpected graphics API %u", static_cast<unsigned>(graphicsApi));
++        ALOGE("Unexpected graphics API %u", static_cast<unsigned>(graphicsApi));
+     }
+ 
+     if (!mBackendTexture.isValid() || !desc.width || !desc.height) {
+-        LOG_ALWAYS_FATAL("Failed to create a valid texture. [%p]:[%d,%d] isProtected:%d "
++        ALOGE("Failed to create a valid texture. [%p]:[%d,%d] isProtected:%d "
+                          "isWriteable:%d format:%d",
+                          this, desc.width, desc.height, createProtectedImage, isOutputBuffer,
+                          desc.format);
+@@ -124,6 +124,21 @@ sk_sp<SkImage> GaneshBackendTexture::makeImage(SkAlphaType alphaType, ui::Datasp
              SkImages::BorrowTextureFrom(mGrContext.get(), mBackendTexture, kTopLeft_GrSurfaceOrigin,
-                                         colorType, alphaType, toSkColorSpace(dataspace),
+                                         colorType, alphaType, toSkColorSpace(dataspace, options),
                                          releaseImageProc, releaseContext);
 +    if (!image) {
-+        // Fallback 1: try with nullptr color space
 +        image = SkImages::BorrowTextureFrom(mGrContext.get(), mBackendTexture, kTopLeft_GrSurfaceOrigin,
 +                                            colorType, alphaType, nullptr,
 +                                            releaseImageProc, releaseContext);
 +    }
 +    if (!image) {
-+        // Fallback 2: try with standard RGBA_8888 and nullptr color space
 +        image = SkImages::BorrowTextureFrom(mGrContext.get(), mBackendTexture, kTopLeft_GrSurfaceOrigin,
 +                                            kRGBA_8888_SkColorType, alphaType, nullptr,
 +                                            releaseImageProc, releaseContext);
 +    }
 +    if (!image) {
-+        // Fallback 3: try with RGBA_8888 and Premul alpha
 +        image = SkImages::BorrowTextureFrom(mGrContext.get(), mBackendTexture, kTopLeft_GrSurfaceOrigin,
 +                                            kRGBA_8888_SkColorType, kPremul_SkAlphaType, nullptr,
 +                                            releaseImageProc, releaseContext);
 +    }
      if (!image) {
-         logFatalTexture("Unable to generate SkImage.", dataspace, colorType);
+         logFatalTexture("Unable to generate SkImage.", dataspace, colorType, alphaType);
      }
-@@ -122,36 +140,36 @@ void GaneshBackendTexture::logFatalTexture(const char* msg, ui::Dataspace datasp
+@@ -163,7 +178,7 @@ void GaneshBackendTexture::logFatalTexture(const char* msg, ui::Dataspace datasp
              GrGLTextureInfo textureInfo;
              bool retrievedTextureInfo =
                      GrBackendTextures::GetGLTextureInfo(mBackendTexture, &textureInfo);
 -            LOG_ALWAYS_FATAL("%s isTextureValid:%d dataspace:%d"
--                             "\n\tGrBackendTexture: (%i x %i) hasMipmaps: %i isProtected: %i "
--                             "texType: %i\n\t\tGrGLTextureInfo: success: %i fTarget: %u fFormat: %u"
--                             " colorType %i",
--                             msg, mBackendTexture.isValid(), static_cast<int32_t>(dataspace),
--                             mBackendTexture.width(), mBackendTexture.height(),
--                             mBackendTexture.hasMipmaps(), mBackendTexture.isProtected(),
--                             static_cast<int>(mBackendTexture.textureType()), retrievedTextureInfo,
--                             textureInfo.fTarget, textureInfo.fFormat, colorType);
 +            ALOGE("%s isTextureValid:%d dataspace:%d"
-+                  "\n\tGrBackendTexture: (%i x %i) hasMipmaps: %i isProtected: %i "
-+                  "texType: %i\n\t\tGrGLTextureInfo: success: %i fTarget: %u fFormat: %u"
-+                  " colorType %i",
-+                  msg, mBackendTexture.isValid(), static_cast<int32_t>(dataspace),
-+                  mBackendTexture.width(), mBackendTexture.height(),
-+                  mBackendTexture.hasMipmaps(), mBackendTexture.isProtected(),
-+                  static_cast<int>(mBackendTexture.textureType()), retrievedTextureInfo,
-+                  textureInfo.fTarget, textureInfo.fFormat, colorType);
-             break;
-         }
-         case GrBackendApi::kVulkan: {
+                              "\n\tGrBackendTexture: (%i x %i) hasMipmaps: %i isProtected: %i "
+                              "texType: %i\n\t\tGrGLTextureInfo: success: %i fTarget: %u fFormat: %u"
+                              " colorType %i alphatype: %i",
+@@ -178,7 +193,7 @@ void GaneshBackendTexture::logFatalTexture(const char* msg, ui::Dataspace datasp
              GrVkImageInfo imageInfo;
              bool retrievedImageInfo =
                      GrBackendTextures::GetVkImageInfo(mBackendTexture, &imageInfo);
 -            LOG_ALWAYS_FATAL("%s isTextureValid:%d dataspace:%d"
--                             "\n\tGrBackendTexture: (%i x %i) hasMipmaps: %i isProtected: %i "
--                             "texType: %i\n\t\tVkImageInfo: success: %i fFormat: %i "
--                             "fSampleCount: %u fLevelCount: %u colorType %i",
--                             msg, mBackendTexture.isValid(), static_cast<int32_t>(dataspace),
--                             mBackendTexture.width(), mBackendTexture.height(),
--                             mBackendTexture.hasMipmaps(), mBackendTexture.isProtected(),
--                             static_cast<int>(mBackendTexture.textureType()), retrievedImageInfo,
--                             imageInfo.fFormat, imageInfo.fSampleCount, imageInfo.fLevelCount,
--                             colorType);
 +            ALOGE("%s isTextureValid:%d dataspace:%d"
-+                  "\n\tGrBackendTexture: (%i x %i) hasMipmaps: %i isProtected: %i "
-+                  "texType: %i\n\t\tVkImageInfo: success: %i fFormat: %i "
-+                  "fSampleCount: %u fLevelCount: %u colorType %i",
-+                  msg, mBackendTexture.isValid(), static_cast<int32_t>(dataspace),
-+                  mBackendTexture.width(), mBackendTexture.height(),
-+                  mBackendTexture.hasMipmaps(), mBackendTexture.isProtected(),
-+                  static_cast<int>(mBackendTexture.textureType()), retrievedImageInfo,
-+                  imageInfo.fFormat, imageInfo.fSampleCount, imageInfo.fLevelCount,
-+                  colorType);
+                              "\n\tGrBackendTexture: (%i x %i) hasMipmaps: %i isProtected: %i "
+                              "texType: %i\n\t\tVkImageInfo: success: %i fFormat: %i "
+                              "fSampleCount: %u fLevelCount: %u colorType %i alphaType: %i",
+@@ -191,7 +206,7 @@ void GaneshBackendTexture::logFatalTexture(const char* msg, ui::Dataspace datasp
              break;
          }
          default:
 -            LOG_ALWAYS_FATAL("%s Unexpected backend %u", msg,
--                             static_cast<unsigned>(mBackendTexture.backend()));
 +            ALOGE("%s Unexpected backend %u", msg,
-+                  static_cast<unsigned>(mBackendTexture.backend()));
+                              static_cast<unsigned>(mBackendTexture.backend()));
              break;
      }
- }
 diff --git a/services/surfaceflinger/surfaceflinger.rc b/services/surfaceflinger/surfaceflinger.rc
 index dfdd4aa..9db1ccf 100644
 --- a/services/surfaceflinger/surfaceflinger.rc

@@ -30,103 +30,105 @@ index 1557a95..8ca4c9f 100644
  
      for (const auto& listIter : optionalInterfaces) {
 diff --git a/bluetooth/1.0/default/bluetooth_hci.cc b/bluetooth/1.0/default/bluetooth_hci.cc
-index a2211f4..02c387e 100644
+index c8fe21c..6ec1a21 100644
 --- a/bluetooth/1.0/default/bluetooth_hci.cc
 +++ b/bluetooth/1.0/default/bluetooth_hci.cc
-@@ -112,7 +112,10 @@ Return<void> BluetoothHci::initialize(
+@@ -119,7 +119,10 @@ Return<void> BluetoothHci::initialize(const ::android::sp<IBluetoothHciCallbacks
  
  Return<void> BluetoothHci::close() {
-   ALOGI("BluetoothHci::close()");
--  unlink_cb_(death_recipient_);
-+  if (unlink_cb_) {
-+    unlink_cb_(death_recipient_);
-+    unlink_cb_ = nullptr;
-+  }
-   VendorInterface::Shutdown();
-   return Void();
+     ALOGI("BluetoothHci::close()");
+-    unlink_cb_(death_recipient_);
++    if (unlink_cb_) {
++        unlink_cb_(death_recipient_);
++        unlink_cb_ = nullptr;
++    }
+     VendorInterface::Shutdown();
+     return Void();
  }
 diff --git a/bluetooth/1.0/default/h4_protocol.cc b/bluetooth/1.0/default/h4_protocol.cc
-index 2459687..deb816a 100644
+index 549aeaf..7e84f04 100644
 --- a/bluetooth/1.0/default/h4_protocol.cc
 +++ b/bluetooth/1.0/default/h4_protocol.cc
-@@ -80,9 +80,29 @@ size_t H4Protocol::Send(uint8_t type, const uint8_t* data, size_t length) {
+@@ -79,9 +79,31 @@ size_t H4Protocol::Send(uint8_t type, const uint8_t* data, size_t length) {
  
  void H4Protocol::OnPacketReady() {
-   switch (hci_packet_type_) {
--    case HCI_PACKET_TYPE_EVENT:
--      event_cb_(hci_packetizer_.GetPacket());
-+    case HCI_PACKET_TYPE_EVENT: {
-+      const hidl_vec<uint8_t>& orig_pkt = hci_packetizer_.GetPacket();
-+      if (orig_pkt.size() >= 5 && orig_pkt[0] == 0x0e && orig_pkt[3] == 0x14 && orig_pkt[4] == 0x0c) {
-+        // Opcode 0x0C14: Read Local Name. Needs 254 total bytes (2 header + 3 cmd_complete + 1 status + 248 name)
-+        if (orig_pkt.size() < 254) {
-+          ALOGI("%s: Expanding truncated ReadLocalName packet from %zu to 254 bytes", __func__, orig_pkt.size());
-+          hidl_vec<uint8_t> fixed_pkt;
-+          fixed_pkt.resize(254);
-+          memset(fixed_pkt.data(), 0, 254);
-+          memcpy(fixed_pkt.data(), orig_pkt.data(), orig_pkt.size());
-+          fixed_pkt[1] = 252; // parameter total length: 3 + 1 + 248
-+          fixed_pkt[5] = 0;   // status: success
-+          if (fixed_pkt[6] == 0) {
-+            const char* dev_name = "Xperia Z3 Compact";
-+            strncpy(reinterpret_cast<char*>(fixed_pkt.data() + 6), dev_name, 247);
-+          }
-+          event_cb_(fixed_pkt);
-+          break;
+     switch (hci_packet_type_) {
+-        case HCI_PACKET_TYPE_EVENT:
+-            event_cb_(hci_packetizer_.GetPacket());
++        case HCI_PACKET_TYPE_EVENT: {
++            const hidl_vec<uint8_t>& orig_pkt = hci_packetizer_.GetPacket();
++            if (orig_pkt.size() >= 5 && orig_pkt[0] == 0x0e && orig_pkt[3] == 0x14 &&
++                orig_pkt[4] == 0x0c) {
++                // Opcode 0x0C14: Read Local Name. Needs 254 total bytes
++                if (orig_pkt.size() < 254) {
++                    ALOGI("%s: Expanding truncated ReadLocalName packet from %zu to 254 bytes",
++                          __func__, orig_pkt.size());
++                    hidl_vec<uint8_t> fixed_pkt;
++                    fixed_pkt.resize(254);
++                    memset(fixed_pkt.data(), 0, 254);
++                    memcpy(fixed_pkt.data(), orig_pkt.data(), orig_pkt.size());
++                    fixed_pkt[1] = 252;  // parameter total length: 3 + 1 + 248
++                    fixed_pkt[5] = 0;    // status: success
++                    if (fixed_pkt[6] == 0) {
++                        const char* dev_name = "Xperia Z3 Compact";
++                        strncpy(reinterpret_cast<char*>(fixed_pkt.data() + 6), dev_name, 247);
++                    }
++                    event_cb_(fixed_pkt);
++                    break;
++                }
++            }
++            event_cb_(orig_pkt);
+             break;
 +        }
-+      }
-+      event_cb_(orig_pkt);
-       break;
-+    }
-     case HCI_PACKET_TYPE_ACL_DATA:
-       acl_cb_(hci_packetizer_.GetPacket());
-       break;
-@@ -96,8 +116,9 @@ void H4Protocol::OnPacketReady() {
-       ALOGE("%s: Unknown packet sent", __func__);
-       break;
-     default:
--      LOG_ALWAYS_FATAL("%s: Unimplemented packet type %d", __func__,
--                       static_cast<int>(hci_packet_type_));
-+      ALOGE("%s: Unimplemented packet type %d", __func__,
-+            static_cast<int>(hci_packet_type_));
-+      break;
-   }
-   // Get ready for the next type byte.
-   hci_packet_type_ = HCI_PACKET_TYPE_UNKNOWN;
-@@ -128,8 +149,18 @@ void H4Protocol::OnDataReady(int fd) {
-         hci_packet_type_ != HCI_PACKET_TYPE_SCO_DATA &&
-         hci_packet_type_ != HCI_PACKET_TYPE_ISO_DATA &&
-         hci_packet_type_ != HCI_PACKET_TYPE_EVENT) {
--      LOG_ALWAYS_FATAL("%s: Unimplemented packet type %d", __func__,
--                       static_cast<int>(hci_packet_type_));
-+      if (buffer[0] == 0x0e || buffer[0] == 0x0f || buffer[0] == 0xff || buffer[0] == 0x13) {
-+        ALOGI("%s: Received raw HCI event code 0x%02x without H4 prefix, wrapping as EVENT",
-+              __func__, buffer[0]);
-+        hci_packet_type_ = HCI_PACKET_TYPE_EVENT;
-+        hci_packetizer_.OnFirstByteReady(buffer[0]);
-+        hci_packetizer_.OnDataReady(fd, hci_packet_type_);
-+      } else {
-+        ALOGE("%s: Unimplemented packet type %d (0x%02x), ignoring byte", __func__,
-+              static_cast<int>(hci_packet_type_), buffer[0]);
-+        hci_packet_type_ = HCI_PACKET_TYPE_UNKNOWN;
-+        return;
-+      }
+         case HCI_PACKET_TYPE_ACL_DATA:
+             acl_cb_(hci_packetizer_.GetPacket());
+             break;
+@@ -95,8 +117,9 @@ void H4Protocol::OnPacketReady() {
+             ALOGE("%s: Unknown packet sent", __func__);
+             break;
+         default:
+-            LOG_ALWAYS_FATAL("%s: Unimplemented packet type %d", __func__,
+-                             static_cast<int>(hci_packet_type_));
++            ALOGE("%s: Unimplemented packet type %d", __func__,
++                  static_cast<int>(hci_packet_type_));
++            break;
      }
-   } else {
-     hci_packetizer_.OnDataReady(fd, hci_packet_type_);
+     // Get ready for the next type byte.
+     hci_packet_type_ = HCI_PACKET_TYPE_UNKNOWN;
+@@ -126,8 +149,18 @@ void H4Protocol::OnDataReady(int fd) {
+             hci_packet_type_ != HCI_PACKET_TYPE_SCO_DATA &&
+             hci_packet_type_ != HCI_PACKET_TYPE_ISO_DATA &&
+             hci_packet_type_ != HCI_PACKET_TYPE_EVENT) {
+-            LOG_ALWAYS_FATAL("%s: Unimplemented packet type %d", __func__,
+-                             static_cast<int>(hci_packet_type_));
++            if (buffer[0] == 0x0e || buffer[0] == 0x0f || buffer[0] == 0xff || buffer[0] == 0x13) {
++                ALOGI("%s: Received raw HCI event code 0x%02x without H4 prefix, wrapping as EVENT",
++                      __func__, buffer[0]);
++                hci_packet_type_ = HCI_PACKET_TYPE_EVENT;
++                hci_packetizer_.OnFirstByteReady(buffer[0]);
++                hci_packetizer_.OnDataReady(fd, hci_packet_type_);
++            } else {
++                ALOGE("%s: Unimplemented packet type %d (0x%02x), ignoring byte", __func__,
++                      static_cast<int>(hci_packet_type_), buffer[0]);
++                hci_packet_type_ = HCI_PACKET_TYPE_UNKNOWN;
++                return;
++            }
+         }
+     } else {
+         hci_packetizer_.OnDataReady(fd, hci_packet_type_);
 diff --git a/bluetooth/1.0/default/hci_packetizer.h b/bluetooth/1.0/default/hci_packetizer.h
-index 90579bd..17d30b4 100644
+index a1c6ecf..9ed8f20 100644
 --- a/bluetooth/1.0/default/hci_packetizer.h
 +++ b/bluetooth/1.0/default/hci_packetizer.h
-@@ -35,6 +35,11 @@ class HciPacketizer {
-   HciPacketizer(HciPacketReadyCallback packet_cb)
-       : packet_ready_cb_(packet_cb){};
-   void OnDataReady(int fd, HciPacketType packet_type);
-+  void OnFirstByteReady(uint8_t byte) {
-+    state_ = HCI_PREAMBLE;
-+    preamble_[0] = byte;
-+    bytes_read_ = 1;
-+  }
-   const hidl_vec<uint8_t>& GetPacket() const;
+@@ -34,6 +34,11 @@ class HciPacketizer {
+   public:
+     HciPacketizer(HciPacketReadyCallback packet_cb) : packet_ready_cb_(packet_cb) {};
+     void OnDataReady(int fd, HciPacketType packet_type);
++    void OnFirstByteReady(uint8_t byte) {
++        state_ = HCI_PREAMBLE;
++        preamble_[0] = byte;
++        bytes_read_ = 1;
++    }
+     const hidl_vec<uint8_t>& GetPacket() const;
  
-  protected:
+   protected:

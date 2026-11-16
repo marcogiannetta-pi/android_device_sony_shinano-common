@@ -1,26 +1,42 @@
 diff --git a/build/tasks/kernel.mk b/build/tasks/kernel.mk
-index a4846e3..48c2740 100644
+index f081f79..fdea627 100644
 --- a/build/tasks/kernel.mk
 +++ b/build/tasks/kernel.mk
-@@ -320,14 +320,14 @@ endef
+@@ -267,6 +267,15 @@ ifeq ($(KERNEL_CC),)
+     KERNEL_CC := CC="$(CCACHE_BIN) clang" LD=ld.lld
+ endif
+ 
++ifeq ($(TARGET_KERNEL_CLANG_COMPILE),false)
++    KERNEL_TOOLCHAIN_arm := $(BUILD_TOP)/prebuilts/gcc/$(HOST_PREBUILT_TAG)/arm/arm-linux-androideabi-4.9/bin
++    KERNEL_TOOLCHAIN_PREFIX_arm := arm-linux-androideabi-
++    KERNEL_CROSS_COMPILE := CROSS_COMPILE="$(CCACHE_BIN) $(KERNEL_TOOLCHAIN_arm)/$(KERNEL_TOOLCHAIN_PREFIX_arm)"
++    KERNEL_CLANG_TRIPLE :=
++    KERNEL_CC := CC="$(CCACHE_BIN) $(KERNEL_TOOLCHAIN_arm)/$(KERNEL_TOOLCHAIN_PREFIX_arm)gcc" LD=$(KERNEL_TOOLCHAIN_arm)/$(KERNEL_TOOLCHAIN_PREFIX_arm)ld
++    KERNEL_MAKE_FLAGS := $(filter-out LLVM=1 LLVM_IAS=1, $(KERNEL_MAKE_FLAGS))
++endif
++
+ # System tools are no longer allowed on 10+
+ PATH_OVERRIDE += $(TOOLS_PATH_OVERRIDE)
+ 
+@@ -306,14 +315,14 @@ endef
  # $(2): The defconfig to process (full path to file)
  define make-kernel-config
  	cp $(word 1,$(2)) $(1)/.config; \
 -	$(call internal-make-kernel-target,$(1),olddefconfig); \
 +	$(call internal-make-kernel-target,$(1),olddefconfig || $(KERNEL_MAKE_CMD) $(KERNEL_MAKE_FLAGS) -C $(BUILD_TOP)/$(KERNEL_SRC) O=$(KERNEL_BUILD_OUT_PREFIX)$(1) ARCH=$(KERNEL_ARCH) $(KERNEL_CROSS_COMPILE) $(KERNEL_CLANG_TRIPLE) $(KERNEL_CC) oldnoconfig); \
  	$(if $(filter true,$(MERGE_ALL_KERNEL_CONFIGS_AT_ONCE)),\
- 		$(KERNEL_SRC)/scripts/kconfig/merge_config.sh -m -O $(1) $(1)/.config $(filter %.config,$(2)); \
+ 		( cd $(abspath $(1)) && $(abspath $(KERNEL_SRC))/scripts/kconfig/merge_config.sh -m -O $(abspath $(1)) $(abspath $(1))/.config $(abspath $(filter %.config,$(2))) ); \
 -		$(call internal-make-kernel-target,$(1),olddefconfig); \
 +		$(call internal-make-kernel-target,$(1),olddefconfig || $(KERNEL_MAKE_CMD) $(KERNEL_MAKE_FLAGS) -C $(BUILD_TOP)/$(KERNEL_SRC) O=$(KERNEL_BUILD_OUT_PREFIX)$(1) ARCH=$(KERNEL_ARCH) $(KERNEL_CROSS_COMPILE) $(KERNEL_CLANG_TRIPLE) $(KERNEL_CC) oldnoconfig); \
  	, \
  		$(foreach config,$(filter %.config,$(2)), \
- 			$(KERNEL_SRC)/scripts/kconfig/merge_config.sh -m -O $(1) $(1)/.config $(config); \
+ 			( cd $(abspath $(1)) && $(abspath $(KERNEL_SRC))/scripts/kconfig/merge_config.sh -m -O $(abspath $(1)) $(abspath $(1))/.config $(abspath $(config)) ); \
 -			$(call internal-make-kernel-target,$(1),olddefconfig); \
 +			$(call internal-make-kernel-target,$(1),olddefconfig || $(KERNEL_MAKE_CMD) $(KERNEL_MAKE_FLAGS) -C $(BUILD_TOP)/$(KERNEL_SRC) O=$(KERNEL_BUILD_OUT_PREFIX)$(1) ARCH=$(KERNEL_ARCH) $(KERNEL_CROSS_COMPILE) $(KERNEL_CLANG_TRIPLE) $(KERNEL_CC) oldnoconfig); \
  		) \
  	)
  	$(hide) if [ "$(KERNEL_LTO)" = "none" ]; then \
-@@ -337,7 +337,7 @@ define make-kernel-config
+@@ -323,7 +332,7 @@ define make-kernel-config
  			-d LTO_CLANG_THIN \
  			-d LTO_CLANG_FULL \
  			-d THINLTO; \
@@ -29,7 +45,7 @@ index a4846e3..48c2740 100644
  		elif [ "$(KERNEL_LTO)" = "thin" ]; then \
  			$(KERNEL_SRC)/scripts/config --file $(1)/.config \
  			-e LTO_CLANG \
-@@ -345,7 +345,7 @@ define make-kernel-config
+@@ -331,7 +340,7 @@ define make-kernel-config
  			-e LTO_CLANG_THIN \
  			-d LTO_CLANG_FULL \
  			-e THINLTO; \
@@ -38,7 +54,7 @@ index a4846e3..48c2740 100644
  		elif [ "$(KERNEL_LTO)" = "full" ]; then \
  			$(KERNEL_SRC)/scripts/config --file $(1)/.config \
  			-e LTO_CLANG \
-@@ -353,7 +353,7 @@ define make-kernel-config
+@@ -339,7 +348,7 @@ define make-kernel-config
  			-d LTO_CLANG_THIN \
  			-e LTO_CLANG_FULL \
  			-d THINLTO; \

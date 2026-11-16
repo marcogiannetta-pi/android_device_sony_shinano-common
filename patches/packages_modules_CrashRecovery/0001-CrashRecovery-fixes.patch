@@ -1,8 +1,8 @@
 diff --git a/service/java/com/android/server/RescueParty.java b/service/java/com/android/server/RescueParty.java
-index 1b4046a..cdde3fd 100644
+index 1c85530..d43eca1 100644
 --- a/service/java/com/android/server/RescueParty.java
 +++ b/service/java/com/android/server/RescueParty.java
-@@ -152,39 +152,7 @@ public class RescueParty {
+@@ -149,39 +149,7 @@ public class RescueParty {
      }
  
      private static boolean isDisabled() {
@@ -24,11 +24,11 @@ index 1b4046a..cdde3fd 100644
 -            return true;
 -        }
 -
--        // We're disabled on userdebug devices connected over USB, since that's
--        // a decent signal that someone is actively trying to debug the device,
--        // or that it's in a lab environment.
--        if (Build.TYPE.equals("userdebug") && isUsbActive()) {
--            Slog.v(TAG, "Disabled because of active USB connection");
+-        // We're disabled on all userdebug builds, as this is a decent signal
+-        // that someone is actively trying to debug the device, or that it's
+-        // in a lab environment.
+-        if (Build.TYPE.equals("userdebug")) {
+-            Slog.v(TAG, "Disabled because of userdebug build");
 -            return true;
 -        }
 -
@@ -43,10 +43,10 @@ index 1b4046a..cdde3fd 100644
      }
  
      @VisibleForTesting
-@@ -343,69 +311,14 @@ public class RescueParty {
+@@ -347,71 +315,12 @@ public class RescueParty {
  
-     private static void executeWarmReboot(Context context, int level,
-             @Nullable String failedPackage) {
+     private static void executeWarmReboot(
+             Context context, int level, @Nullable String failedPackage) {
 -        if (shouldThrottleReboot()) {
 -            return;
 -        }
@@ -65,25 +65,25 @@ index 1b4046a..cdde3fd 100644
 -                logRescueException(level, failedPackage, t);
 -            }
 -        } else {
--            Runnable runnable = () -> {
--                try {
--                    PowerManager pm = context.getSystemService(PowerManager.class);
--                    if (pm != null) {
--                        pm.reboot(TAG);
--                    }
--                } catch (Throwable t) {
--                    logRescueException(level, failedPackage, t);
--                }
--            };
+-            Runnable runnable =
+-                    () -> {
+-                        try {
+-                            PowerManager pm = context.getSystemService(PowerManager.class);
+-                            if (pm != null) {
+-                                pm.reboot(TAG);
+-                            }
+-                        } catch (Throwable t) {
+-                            logRescueException(level, failedPackage, t);
+-                        }
+-                    };
 -            Thread thread = new Thread(runnable);
 -            thread.start();
 -        }
-+        Slog.w(TAG, "Warm reboot requested by RescueParty, disabled on this build");
-+        return;
++        Slog.w(TAG, "RescueParty warm reboot suppressed (level=" + level + ", pkg=" + failedPackage + ")");
      }
  
-     private static void executeFactoryReset(Context context, int level,
-             @Nullable String failedPackage) {
+     private static void executeFactoryReset(
+             Context context, int level, @Nullable String failedPackage) {
 -        if (shouldThrottleReboot()) {
 -            return;
 -        }
@@ -98,22 +98,22 @@ index 1b4046a..cdde3fd 100644
 -                logRescueException(level, failedPackage, t);
 -            }
 -        } else {
--            Runnable runnable = new Runnable() {
--                @Override
--                public void run() {
--                    try {
--                        RecoverySystem.rebootPromptAndWipeUserData(context,
--                            TAG + "," + failedPackage);
--                    } catch (Throwable t) {
--                        logRescueException(level, failedPackage, t);
--                    }
--                }
--            };
+-            Runnable runnable =
+-                    new Runnable() {
+-                        @Override
+-                        public void run() {
+-                            try {
+-                                RecoverySystem.rebootPromptAndWipeUserData(
+-                                        context, TAG + "," + failedPackage);
+-                            } catch (Throwable t) {
+-                                logRescueException(level, failedPackage, t);
+-                            }
+-                        }
+-                    };
 -            Thread thread = new Thread(runnable);
 -            thread.start();
 -        }
-+        Slog.w(TAG, "Factory reset requested by RescueParty, disabled on this build");
-+        return;
++        Slog.w(TAG, "RescueParty factory reset suppressed (level=" + level + ", pkg=" + failedPackage + ")");
      }
  
- 
+     private static String getCompleteMessage(Throwable t) {

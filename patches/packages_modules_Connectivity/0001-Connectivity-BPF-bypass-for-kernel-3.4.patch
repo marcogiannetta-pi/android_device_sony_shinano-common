@@ -1,8 +1,8 @@
 diff --git a/bpf/headers/include/bpf/BpfMap.h b/bpf/headers/include/bpf/BpfMap.h
-index 8ef564d..5be5dd0 100644
+index 00a6e76..4b1438f 100644
 --- a/bpf/headers/include/bpf/BpfMap.h
 +++ b/bpf/headers/include/bpf/BpfMap.h
-@@ -106,6 +106,7 @@ class BpfMapRO {
+@@ -110,6 +110,7 @@ class BpfMapRO {
  
    protected:
      void abortOnMismatch(bool writable) const {
@@ -11,10 +11,10 @@ index 8ef564d..5be5dd0 100644
          if (isAtLeastKernelVersion(4, 14)) {
              int flags = bpfGetFdMapFlags(mMapFd);
 diff --git a/bpf/loader/NetBpfLoad.cpp b/bpf/loader/NetBpfLoad.cpp
-index 2388647..55cfeb7 100644
+index 7ba3247..53780d0 100644
 --- a/bpf/loader/NetBpfLoad.cpp
 +++ b/bpf/loader/NetBpfLoad.cpp
-@@ -1947,6 +1947,18 @@ static int doLoad(char** argv, char * const envp[]) {
+@@ -1895,6 +1895,18 @@ static int doLoad(char** argv, char * const envp[]) {
  }  // namespace android
  
  int main(int argc, char** argv, char * const envp[]) {
@@ -34,11 +34,11 @@ index 2388647..55cfeb7 100644
          InitLogging(argv, &KernelLogger);
      } else {
 diff --git a/bpf/loader/netbpfload.rc b/bpf/loader/netbpfload.rc
-index 0430dfe..0310703 100644
+index a937d7e..5a3e28e 100644
 --- a/bpf/loader/netbpfload.rc
 +++ b/bpf/loader/netbpfload.rc
-@@ -12,5 +12,5 @@
- service bpfloader /system/bin/false
+@@ -65,5 +65,5 @@ service bpfloader /system/bin/false
+     disabled # started on demand via trigger
      user root
      oneshot
 -    reboot_on_failure reboot,netbpfload-missing
@@ -218,13 +218,13 @@ index b7c4e34..f87a457 100644
          }
      }
 diff --git a/service-t/native/libs/libnetworkstats/BpfNetworkStats.cpp b/service-t/native/libs/libnetworkstats/BpfNetworkStats.cpp
-index ae8dbbe..0760396 100644
+index e2b6e1e..982c839 100644
 --- a/service-t/native/libs/libnetworkstats/BpfNetworkStats.cpp
 +++ b/service-t/native/libs/libnetworkstats/BpfNetworkStats.cpp
-@@ -74,6 +74,11 @@ static inline const IfaceValue& updateCache(unsigned i, const IfaceValue &v) {
+@@ -75,6 +75,11 @@ static inline const IfaceValue& updateCache(unsigned i, const IfaceValue &v) {
  }
  
- Result<IfaceValue> ifindex2name(const uint32_t ifindex) {
+ static Result<IfaceValue> ifindex2name(const uint32_t ifindex) {
 +    if (!getIfaceIndexNameMap().isValid()) {
 +        IfaceValue iv = {};
 +        if (if_indextoname(ifindex, iv.name)) return iv;
@@ -233,7 +233,7 @@ index ae8dbbe..0760396 100644
      if (ifindex < cacheSize) {
  #ifdef CACHE_IS_ATOMIC
          IfaceValue c = cache[ifindex].load(std::memory_order_relaxed);
-@@ -96,6 +101,7 @@ void bpfRegisterIface(const char* iface) {
+@@ -97,6 +102,7 @@ void bpfRegisterIface(const char* iface) {
      if (strlen(iface) >= sizeof(IfaceValue)) return;
      uint32_t ifindex = if_nametoindex(iface);
      if (!ifindex) return;
@@ -241,7 +241,7 @@ index ae8dbbe..0760396 100644
      IfaceValue ifname = {};
      strlcpy(ifname.name, iface, sizeof(ifname.name));
      getIfaceIndexNameMap().writeValue(ifindex, ifname, BPF_ANY);
-@@ -104,9 +110,10 @@ void bpfRegisterIface(const char* iface) {
+@@ -105,9 +111,10 @@ void bpfRegisterIface(const char* iface) {
  
  int bpfGetUidStatsInternal(uid_t uid, StatsValue* stats,
                             const BpfMapRO<uint32_t, StatsValue>& appUidStatsMap) {
@@ -253,7 +253,7 @@ index ae8dbbe..0760396 100644
          return (statsEntry.error().code() == ENOENT) ? 0 : -statsEntry.error().code();
      }
      *stats = statsEntry.value();
-@@ -255,11 +262,15 @@ int parseBpfNetworkStatsDetail(std::vector<stats_line>* lines) {
+@@ -256,11 +263,15 @@ int parseBpfNetworkStatsDetail(std::vector<stats_line>* lines) {
      static BpfMapRO<uint32_t, uint32_t> configurationMap(CONFIGURATION_MAP_PATH);
      static BpfMap<StatsKey, StatsValue> statsMapA(STATS_MAP_A_PATH);
      static BpfMap<StatsKey, StatsValue> statsMapB(STATS_MAP_B_PATH);
@@ -335,10 +335,10 @@ index 7d48b71..e17179e 100644
      }
  
 diff --git a/service-t/src/com/android/server/net/NetworkStatsService.java b/service-t/src/com/android/server/net/NetworkStatsService.java
-index c82955f..b7a4199 100644
+index 14809fb..555ffb5 100644
 --- a/service-t/src/com/android/server/net/NetworkStatsService.java
 +++ b/service-t/src/com/android/server/net/NetworkStatsService.java
-@@ -916,7 +916,8 @@ public class NetworkStatsService extends INetworkStatsService.Stub {
+@@ -920,7 +920,8 @@ public class NetworkStatsService extends INetworkStatsService.Stub {
              try {
                  return new BpfMap<>(IFACE_STATS_MAP_PATH, S32.class, StatsMapValue.class);
              } catch (ErrnoException e) {
@@ -348,7 +348,7 @@ index c82955f..b7a4199 100644
              }
          }
  
-@@ -3252,6 +3253,9 @@ public class NetworkStatsService extends INetworkStatsService.Stub {
+@@ -3327,6 +3328,9 @@ public class NetworkStatsService extends INetworkStatsService.Stub {
  
      @GuardedBy("mStatsLock")
      private void dumpIfaceStatsMapLocked(final IndentingPrintWriter pw) {
@@ -382,101 +382,43 @@ index 70991eb..d1b7e4a 100644
  
  #undef V
 diff --git a/service/src/com/android/server/BpfNetMaps.java b/service/src/com/android/server/BpfNetMaps.java
-index a968193..eacbcb2 100644
+index c1a4799..25d7487 100644
 --- a/service/src/com/android/server/BpfNetMaps.java
 +++ b/service/src/com/android/server/BpfNetMaps.java
-@@ -217,13 +217,104 @@ public class BpfNetMaps {
+@@ -450,13 +450,46 @@ public class BpfNetMaps {
+         sInitialized = initialized;
      }
- 
  
 +    private static class InMemoryBpfMap<K extends Struct, V extends Struct> implements IBpfMap<K, V> {
 +        private final java.util.concurrent.ConcurrentHashMap<K, V> mMap = new java.util.concurrent.ConcurrentHashMap<>();
-+
 +        public InMemoryBpfMap() {}
-+
-+        @Override
-+        public void forEach(ThrowingBiConsumer<K, V> action) throws ErrnoException {
-+            for (java.util.Map.Entry<K, V> entry : mMap.entrySet()) {
-+                action.accept(entry.getKey(), entry.getValue());
-+            }
++        @Override public void forEach(ThrowingBiConsumer<K, V> action) throws ErrnoException {
++            for (java.util.Map.Entry<K, V> entry : mMap.entrySet()) action.accept(entry.getKey(), entry.getValue());
 +        }
-+
-+        @Override
-+        public void updateEntry(K key, V value) throws ErrnoException {
-+            if (key != null && value != null) {
-+                mMap.put(key, value);
-+            }
-+        }
-+
-+        @Override
-+        public void insertEntry(K key, V value) throws ErrnoException, IllegalStateException {
++        @Override public void updateEntry(K key, V value) throws ErrnoException { if (key != null && value != null) mMap.put(key, value); }
++        @Override public void insertEntry(K key, V value) throws ErrnoException, IllegalStateException {
 +            if (key == null || value == null) return;
-+            if (mMap.putIfAbsent(key, value) != null) {
-+                throw new IllegalStateException(key + " already exists");
-+            }
++            if (mMap.putIfAbsent(key, value) != null) throw new IllegalStateException(key + " already exists");
 +        }
-+
-+        @Override
-+        public void replaceEntry(K key, V value) throws ErrnoException, java.util.NoSuchElementException {
-+            if (key == null || value == null || mMap.replace(key, value) == null) {
-+                throw new java.util.NoSuchElementException();
-+            }
++        @Override public void replaceEntry(K key, V value) throws ErrnoException, java.util.NoSuchElementException {
++            if (key == null || value == null || mMap.replace(key, value) == null) throw new java.util.NoSuchElementException();
 +        }
-+
-+        @Override
-+        public boolean insertOrReplaceEntry(K key, V value) throws ErrnoException {
++        @Override public boolean insertOrReplaceEntry(K key, V value) throws ErrnoException {
 +            if (key == null || value == null) return false;
 +            return mMap.put(key, value) == null;
 +        }
-+
-+        @Override
-+        public boolean deleteEntry(K key) throws ErrnoException {
-+            if (key == null) return false;
-+            return mMap.remove(key) != null;
-+        }
-+
-+        @Override
-+        public boolean isEmpty() throws ErrnoException {
-+            return mMap.isEmpty();
-+        }
-+
-+        @Override
-+        public K getNextKey(K key) {
++        @Override public boolean deleteEntry(K key) throws ErrnoException { return key != null && mMap.remove(key) != null; }
++        @Override public boolean isEmpty() throws ErrnoException { return mMap.isEmpty(); }
++        @Override public K getNextKey(K key) {
 +            java.util.Iterator<K> it = mMap.keySet().iterator();
-+            while (it.hasNext()) {
-+                if (java.util.Objects.equals(it.next(), key)) {
-+                    return it.hasNext() ? it.next() : null;
-+                }
-+            }
++            while (it.hasNext()) { if (java.util.Objects.equals(it.next(), key)) return it.hasNext() ? it.next() : null; }
 +            return null;
 +        }
-+
-+        @Override
-+        public K getFirstKey() {
-+            for (K key : mMap.keySet()) {
-+                return key;
-+            }
-+            return null;
-+        }
-+
-+        @Override
-+        public boolean containsKey(K key) throws ErrnoException {
-+            return key != null && mMap.containsKey(key);
-+        }
-+
-+        @Override
-+        public V getValue(K key) throws ErrnoException {
-+            return key != null ? mMap.get(key) : null;
-+        }
-+
-+        @Override
-+        public void clear() throws ErrnoException {
-+            mMap.clear();
-+        }
-+
-+        @Override
-+        public void close() {
-+        }
++        @Override public K getFirstKey() { for (K key : mMap.keySet()) return key; return null; }
++        @Override public boolean containsKey(K key) throws ErrnoException { return key != null && mMap.containsKey(key); }
++        @Override public V getValue(K key) throws ErrnoException { return key != null ? mMap.get(key) : null; }
++        @Override public void clear() throws ErrnoException { mMap.clear(); }
++        @Override public void close() {}
 +    }
 +
      @RequiresApi(Build.VERSION_CODES.TIRAMISU)
@@ -487,103 +429,210 @@ index a968193..eacbcb2 100644
 -        } catch (ErrnoException e) {
 -            throw new IllegalStateException("Cannot open netd configuration map", e);
 +        } catch (Exception e) {
-+            Log.w(TAG, "Cannot open netd configuration map, using in-memory map fallback: " + e);
++            Log.w(TAG, "Cannot open netd configuration map" + ", using in-memory fallback: " + e);
 +            return new InMemoryBpfMap<>();
          }
      }
  
-@@ -232,8 +323,9 @@ public class BpfNetMaps {
+@@ -465,8 +498,9 @@ public class BpfNetMaps {
          try {
              return SingleWriterBpfMap.getSingleton(
                      UID_OWNER_MAP_PATH, S32.class, UidOwnerValue.class);
 -        } catch (ErrnoException e) {
 -            throw new IllegalStateException("Cannot open uid owner map", e);
 +        } catch (Exception e) {
-+            Log.w(TAG, "Cannot open uid owner map, using in-memory map fallback: " + e);
++            Log.w(TAG, "Cannot open uid owner map" + ", using in-memory fallback: " + e);
 +            return new InMemoryBpfMap<>();
          }
      }
  
-@@ -242,8 +334,9 @@ public class BpfNetMaps {
+@@ -475,8 +509,9 @@ public class BpfNetMaps {
          try {
              return SingleWriterBpfMap.getSingleton(
                      UID_PERMISSION_MAP_PATH, S32.class, U8.class);
 -        } catch (ErrnoException e) {
 -            throw new IllegalStateException("Cannot open uid permission map", e);
 +        } catch (Exception e) {
-+            Log.w(TAG, "Cannot open uid permission map, using in-memory map fallback: " + e);
++            Log.w(TAG, "Cannot open uid permission map" + ", using in-memory fallback: " + e);
 +            return new InMemoryBpfMap<>();
          }
      }
  
-@@ -253,8 +346,9 @@ public class BpfNetMaps {
+@@ -485,8 +520,9 @@ public class BpfNetMaps {
+         try {
+             return SingleWriterBpfMap.getSingleton(
+                     UID_PERMISSION_CHUNK_MAP_PATH, S32.class, UidPermissionChunk.class);
+-        } catch (ErrnoException e) {
+-            throw new IllegalStateException("Cannot open uid permission chunk map", e);
++        } catch (Exception e) {
++            Log.w(TAG, "Cannot open uid permission chunk map" + ", using in-memory fallback: " + e);
++            return new InMemoryBpfMap<>();
+         }
+     }
+ 
+@@ -496,8 +532,9 @@ public class BpfNetMaps {
              // Cannot use SingleWriterBpfMap because it's written by ClatCoordinator as well.
              return new BpfMap<>(COOKIE_TAG_MAP_PATH,
                      S64.class, CookieTagMapValue.class);
 -        } catch (ErrnoException e) {
 -            throw new IllegalStateException("Cannot open cookie tag map", e);
 +        } catch (Exception e) {
-+            Log.w(TAG, "Cannot open cookie tag map, using in-memory map fallback: " + e);
++            Log.w(TAG, "Cannot open cookie tag map" + ", using in-memory fallback: " + e);
 +            return new InMemoryBpfMap<>();
          }
      }
  
-@@ -263,8 +357,9 @@ public class BpfNetMaps {
+@@ -506,8 +543,9 @@ public class BpfNetMaps {
          try {
              return SingleWriterBpfMap.getSingleton(
                      DATA_SAVER_ENABLED_MAP_PATH, S32.class, U8.class);
 -        } catch (ErrnoException e) {
 -            throw new IllegalStateException("Cannot open data saver enabled map", e);
 +        } catch (Exception e) {
-+            Log.w(TAG, "Cannot open data saver enabled map, using in-memory map fallback: " + e);
++            Log.w(TAG, "Cannot open data saver enabled map" + ", using in-memory fallback: " + e);
 +            return new InMemoryBpfMap<>();
          }
      }
  
-@@ -273,8 +368,9 @@ public class BpfNetMaps {
+@@ -516,8 +554,9 @@ public class BpfNetMaps {
          try {
              return SingleWriterBpfMap.getSingleton(INGRESS_DISCARD_MAP_PATH,
                      IngressDiscardKey.class, IngressDiscardValue.class);
 -        } catch (ErrnoException e) {
 -            throw new IllegalStateException("Cannot open ingress discard map", e);
 +        } catch (Exception e) {
-+            Log.w(TAG, "Cannot open ingress discard map, using in-memory map fallback: " + e);
++            Log.w(TAG, "Cannot open ingress discard map" + ", using in-memory fallback: " + e);
 +            return new InMemoryBpfMap<>();
          }
      }
  
-@@ -283,8 +379,9 @@ public class BpfNetMaps {
+@@ -526,8 +565,9 @@ public class BpfNetMaps {
          try {
              return SingleWriterBpfMap.getSingleton(LOCAL_NET_BLOCKED_UID_MAP_PATH,
                      U32.class, Bool.class);
 -        } catch (ErrnoException e) {
 -            throw new IllegalStateException("Cannot open local_net_blocked_uid map", e);
 +        } catch (Exception e) {
-+            Log.w(TAG, "Cannot open local_net_blocked_uid map, using in-memory map fallback: " + e);
++            Log.w(TAG, "Cannot open local_net_blocked_uid map" + ", using in-memory fallback: " + e);
 +            return new InMemoryBpfMap<>();
          }
      }
  
-@@ -293,8 +390,9 @@ public class BpfNetMaps {
+@@ -536,8 +576,9 @@ public class BpfNetMaps {
+         try {
+             return SingleWriterBpfMap.getSingleton(LOCAL_NET_UID_HOST_ALLOWLIST_MAP_PATH,
+                     LocalNetUidHostAllowlistKey.class, Bool.class);
+-        } catch (ErrnoException e) {
+-            throw new IllegalStateException("Cannot open local_net_uid_host_access map", e);
++        } catch (Exception e) {
++            Log.w(TAG, "Cannot open local_net_uid_host_access map" + ", using in-memory fallback: " + e);
++            return new InMemoryBpfMap<>();
+         }
+     }
+ 
+@@ -546,8 +587,9 @@ public class BpfNetMaps {
+         try {
+             return SingleWriterBpfMap.getSingleton(LOCAL_NET_CACHE_GENERATION_ID_MAP_PATH,
+                     U32.class, S64.class);
+-        } catch (ErrnoException e) {
+-            throw new IllegalStateException("Cannot open local_net_cache_generation_id map", e);
++        } catch (Exception e) {
++            Log.w(TAG, "Cannot open local_net_cache_generation_id map" + ", using in-memory fallback: " + e);
++            return new InMemoryBpfMap<>();
+         }
+     }
+ 
+@@ -555,8 +597,9 @@ public class BpfNetMaps {
+     private static BpfBoolean getUidMigrationEnabledBpfBoolean() {
+         try {
+             return new BpfBoolean(UID_MIGRATION_ENABLED_MAP_PATH, true);
+-        } catch (ErrnoException e) {
+-            throw new IllegalStateException("Cannot open uid migration enabled map", e);
++        } catch (Exception e) {
++            Log.w(TAG, "Cannot open uid migration enabled map" + ", using in-memory fallback: " + e);
++            return new BpfBoolean(new InMemoryBpfMap<>());
+         }
+     }
+ 
+@@ -564,8 +607,9 @@ public class BpfNetMaps {
+     private static BpfBoolean getLoopbackAccessMetricsEnabledBpfBoolean() {
+         try {
+             return new BpfBoolean(LOOPBACK_ACCESS_METRICS_ENABLED_MAP_PATH, true);
+-        } catch (ErrnoException e) {
+-            throw new IllegalStateException("Cannot open loopback access metrics enabled map", e);
++        } catch (Exception e) {
++            Log.w(TAG, "Cannot open loopback access metrics enabled map" + ", using in-memory fallback: " + e);
++            return new BpfBoolean(new InMemoryBpfMap<>());
+         }
+     }
+ 
+@@ -573,8 +617,9 @@ public class BpfNetMaps {
+     private static BpfBoolean getLoopbackChecksEnabledBpfBoolean() {
+         try {
+             return new BpfBoolean(LOOPBACK_CHECKS_ENABLED_MAP_PATH, true);
+-        } catch (ErrnoException e) {
+-            throw new IllegalStateException("Cannot open loopback checks enabled map", e);
++        } catch (Exception e) {
++            Log.w(TAG, "Cannot open loopback checks enabled map" + ", using in-memory fallback: " + e);
++            return new BpfBoolean(new InMemoryBpfMap<>());
+         }
+     }
+ 
+@@ -583,8 +628,9 @@ public class BpfNetMaps {
+         try {
+             return new BpfBoolean(
+                     PERMISSION_PROPAGATION_ENABLED_MAP_PATH, true);
+-        } catch (ErrnoException e) {
+-            throw new IllegalStateException("Cannot open permission propagation enabled map", e);
++        } catch (Exception e) {
++            Log.w(TAG, "Cannot open permission propagation enabled map" + ", using in-memory fallback: " + e);
++            return new BpfBoolean(new InMemoryBpfMap<>());
+         }
+     }
+ 
+@@ -592,8 +638,9 @@ public class BpfNetMaps {
+     private static BpfBoolean getLocalNetNoteOpsEnabledBpfBoolean() {
+         try {
+             return new BpfBoolean(LOCAL_NET_NOTE_OP_ENABLED_MAP_PATH, true);
+-        } catch (ErrnoException e) {
+-            throw new IllegalStateException("Cannot open LNP note op enabled map", e);
++        } catch (Exception e) {
++            Log.w(TAG, "Cannot open LNP note op enabled map" + ", using in-memory fallback: " + e);
++            return new BpfBoolean(new InMemoryBpfMap<>());
+         }
+     }
+ 
+@@ -602,16 +649,18 @@ public class BpfNetMaps {
          try {
              return SingleWriterBpfMap.getSingleton(LOCAL_NET_ACCESS_MAP_PATH,
                      LocalNetAccessKey.class, Bool.class);
 -        } catch (ErrnoException e) {
 -            throw new IllegalStateException("Cannot open local_net_access map", e);
 +        } catch (Exception e) {
-+            Log.w(TAG, "Cannot open local_net_access map, using in-memory map fallback: " + e);
++            Log.w(TAG, "Cannot open local_net_access map" + ", using in-memory fallback: " + e);
 +            return new InMemoryBpfMap<>();
          }
      }
  
-@@ -306,14 +404,14 @@ public class BpfNetMaps {
+     private static BpfBoolean getL4sEnabledMap() {
+         try {
+             return new BpfBoolean(L4S_ENABLED_MAP_PATH, true /* exclusive */);
+-        } catch (ErrnoException e) {
+-            throw new IllegalStateException("Cannot open l4s_accecn_ map", e);
++        } catch (Exception e) {
++            Log.w(TAG, "Cannot open l4s_accecn_ map" + ", using in-memory fallback: " + e);
++            return new BpfBoolean(new InMemoryBpfMap<>());
+         }
+     }
+ 
+@@ -623,14 +672,14 @@ public class BpfNetMaps {
          try {
              sConfigurationMap.updateEntry(UID_RULES_CONFIGURATION_KEY,
                      new U32(UID_RULES_DEFAULT_CONFIGURATION));
 -        } catch (ErrnoException e) {
 -            throw new IllegalStateException("Failed to initialize uid rules configuration", e);
 +        } catch (Exception e) {
-+            Log.w(TAG, "Failed to initialize uid rules configuration: " + e);
++            Log.w(TAG, "Failed to initialize uid rules configuration" + ": " + e);
          }
          try {
              sConfigurationMap.updateEntry(CURRENT_STATS_MAP_CONFIGURATION_KEY,
@@ -591,33 +640,113 @@ index a968193..eacbcb2 100644
 -        } catch (ErrnoException e) {
 -            throw new IllegalStateException("Failed to initialize current stats configuration", e);
 +        } catch (Exception e) {
-+            Log.w(TAG, "Failed to initialize current stats configuration: " + e);
++            Log.w(TAG, "Failed to initialize current stats configuration" + ": " + e);
          }
  
          if (sUidOwnerMap == null) {
-@@ -321,8 +419,8 @@ public class BpfNetMaps {
+@@ -638,8 +687,8 @@ public class BpfNetMaps {
          }
          try {
              sUidOwnerMap.clear();
 -        } catch (ErrnoException e) {
 -            throw new IllegalStateException("Failed to initialize uid owner map", e);
 +        } catch (Exception e) {
-+            Log.w(TAG, "Failed to initialize uid owner map: " + e);
++            Log.w(TAG, "Failed to initialize uid owner map" + ": " + e);
          }
  
          if (sUidPermissionMap == null) {
-@@ -338,8 +436,8 @@ public class BpfNetMaps {
+@@ -655,8 +704,8 @@ public class BpfNetMaps {
          }
          try {
              sDataSaverEnabledMap.updateEntry(DATA_SAVER_ENABLED_KEY, new U8(DATA_SAVER_DISABLED));
 -        } catch (ErrnoException e) {
 -            throw new IllegalStateException("Failed to initialize data saver configuration", e);
 +        } catch (Exception e) {
-+            Log.w(TAG, "Failed to initialize data saver configuration: " + e);
++            Log.w(TAG, "Failed to initialize data saver configuration" + ": " + e);
          }
  
          if (sIngressDiscardMap == null) {
-@@ -411,7 +509,8 @@ public class BpfNetMaps {
+@@ -664,8 +713,8 @@ public class BpfNetMaps {
+         }
+         try {
+             sIngressDiscardMap.clear();
+-        } catch (ErrnoException e) {
+-            throw new IllegalStateException("Failed to initialize ingress discard map", e);
++        } catch (Exception e) {
++            Log.w(TAG, "Failed to initialize ingress discard map" + ": " + e);
+         }
+ 
+         if (isAtLeastB()) {
+@@ -675,9 +724,9 @@ public class BpfNetMaps {
+                 }
+                 try {
+                     sLocalNetAccessMap.clear();
+-                } catch (ErrnoException e) {
+-                    throw new IllegalStateException("Failed to initialize local_net_access map", e);
+-                }
++                } catch (Exception e) {
++            Log.w(TAG, "Failed to initialize local_net_access map" + ": " + e);
++        }
+             }
+ 
+             if (sLocalNetBlockedUidMap == null) {
+@@ -685,10 +734,9 @@ public class BpfNetMaps {
+             }
+             try {
+                 sLocalNetBlockedUidMap.clear();
+-            } catch (ErrnoException e) {
+-                throw new IllegalStateException("Failed to initialize local_net_blocked_uid map",
+-                        e);
+-            }
++            } catch (Exception e) {
++            Log.w(TAG, "Failed to initialize local_net_blocked_uid map" + ": " + e);
++        }
+ 
+             synchronized (sLocalNetAccessLock) {
+                 if (sLocalNetUidHostAllowlistMap == null) {
+@@ -696,10 +744,9 @@ public class BpfNetMaps {
+                 }
+                 try {
+                     sLocalNetUidHostAllowlistMap.clear();
+-                } catch (ErrnoException e) {
+-                    throw new IllegalStateException(
+-                            "Failed to initialize local_net_uid_host_allowlist map", e);
+-                }
++                } catch (Exception e) {
++            Log.w(TAG, "Failed to initialize local_net_uid_host_allowlist map" + ": " + e);
++        }
+             }
+ 
+             synchronized (sLocalNetAccessLock) {
+@@ -717,10 +764,9 @@ public class BpfNetMaps {
+                         sLocalNetCacheGenerationIdMap.updateEntry(GENERATION_ID_KEY,
+                                 new S64(++sLnpGenerationID));
+                     }
+-                } catch (ErrnoException e) {
+-                    throw new IllegalStateException(
+-                            "Failed to initialize local_net_cache_generation_id map", e);
+-                }
++                } catch (Exception e) {
++            Log.w(TAG, "Failed to initialize local_net_cache_generation_id map" + ": " + e);
++        }
+             }
+         }
+ 
+@@ -730,10 +776,9 @@ public class BpfNetMaps {
+             }
+             try {
+                 sL4sEnabledMap.clear();
+-            } catch (ErrnoException e) {
+-                throw new IllegalStateException("Failed to initialize l4s_accecn_status map",
+-                    e);
+-            }
++            } catch (Exception e) {
++            Log.w(TAG, "Failed to initialize l4s_accecn_status map" + ": " + e);
++        }
+         }
+ 
+         if (sUidMigrationEnabledBpfBoolean == null) {
+@@ -856,7 +901,8 @@ public class BpfNetMaps {
              try {
                  BpfMap.synchronizeKernelRCU();
              } catch (ErrnoException e) {
@@ -627,7 +756,7 @@ index a968193..eacbcb2 100644
              }
              return 0;
          }
-@@ -840,15 +939,17 @@ public class BpfNetMaps {
+@@ -1371,15 +1417,17 @@ public class BpfNetMaps {
  
          try {
              synchronized (sCurrentStatsMapConfigLock) {

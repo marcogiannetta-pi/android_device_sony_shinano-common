@@ -1,0 +1,21 @@
+diff --git a/reference-ril/reference-ril.c b/reference-ril/reference-ril.c
+index 689e01d..5e4c6e1 100644
+--- a/reference-ril/reference-ril.c
++++ b/reference-ril/reference-ril.c
+@@ -520,7 +520,7 @@ static void requestCallSelection(
+     static char conference[]       = "AT+CHLD=3";
+     static char reject[]           = "ATH";
+ 
+-    char* atCommand;
++    char* atCommand = NULL;
+ 
+     if (getSIMStatus() == SIM_ABSENT) {
+         RIL_onRequestComplete(t, RIL_E_RADIO_NOT_AVAILABLE, NULL, 0);
+@@ -556,6 +556,7 @@ static void requestCallSelection(
+             break;
+         default:
+             assert(0);
++            return;
+     }
+     at_send_command(atCommand, NULL);
+     // Success or failure is ignored by the upper layer here.

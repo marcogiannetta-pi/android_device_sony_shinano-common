@@ -42,10 +42,10 @@ index 70ca0e4..0f191a5 100644
  
      // UeventCallback() will remove found partitions from |devices|. So if it
 diff --git a/init/builtins.cpp b/init/builtins.cpp
-index 4cf2b38..8e6c11a 100644
+index 2e4a3b4..431f556 100644
 --- a/init/builtins.cpp
 +++ b/init/builtins.cpp
-@@ -577,7 +577,8 @@ static void import_late(const std::vector<std::string>& rc_paths) {
+@@ -578,7 +578,8 @@ static void import_late(const std::vector<std::string>& rc_paths) {
   * return code is processed based on input code
   */
  static Result<void> queue_fs_event(int code) {
@@ -56,10 +56,10 @@ index 4cf2b38..8e6c11a 100644
          ActionManager::GetInstance().QueueEventTrigger("nonencrypted");
          return {};
 diff --git a/init/devices.cpp b/init/devices.cpp
-index 8cd1ddc..5f47f6f 100644
+index e27de64..c9b9710 100644
 --- a/init/devices.cpp
 +++ b/init/devices.cpp
-@@ -191,6 +191,13 @@ void SysfsPermissions::SetPermissions(const std::string& path) const {
+@@ -237,6 +237,13 @@ void SysfsPermissions::SetPermissionsInternal(const std::string& attribute_file)
  BlockDeviceInfo DeviceHandler::GetBlockDeviceInfo(const std::string& uevent_path) const {
      BlockDeviceInfo info;
  
@@ -74,43 +74,10 @@ index 8cd1ddc..5f47f6f 100644
          // Only use the more specific "MMC" / "NVME" / "SCSI" match if a
          // partition UUID was passed.
 diff --git a/init/first_stage_init.cpp b/init/first_stage_init.cpp
-index 3070fae..855f2f4 100644
+index 8b94699..bfd016b 100644
 --- a/init/first_stage_init.cpp
 +++ b/init/first_stage_init.cpp
-@@ -330,7 +330,32 @@ static std::unique_ptr<FirstStageMount> CreateFirstStageMount(const std::string&
-     }
- }
- 
-+static void SetDebugLed(int r, int g, int b) {
-+    android::base::WriteStringToFile(std::to_string(r), "/sys/class/leds/led:rgb_red/brightness");
-+    android::base::WriteStringToFile(std::to_string(g), "/sys/class/leds/led:rgb_green/brightness");
-+    android::base::WriteStringToFile(std::to_string(b), "/sys/class/leds/led:rgb_blue/brightness");
-+}
-+
-+static void BlinkInitLed(int count) {
-+    android::base::WriteStringToFile("0", "/sys/class/leds/led:rgb_green/brightness");
-+    android::base::WriteStringToFile("0", "/sys/class/leds/led:rgb_blue/brightness");
-+    while (1) {
-+        for (int i = 0; i < count; i++) {
-+            android::base::WriteStringToFile("255", "/sys/class/leds/led:rgb_red/brightness");
-+            usleep(250000);
-+            android::base::WriteStringToFile("0", "/sys/class/leds/led:rgb_red/brightness");
-+            usleep(250000);
-+        }
-+        sleep(2);
-+    }
-+}
-+
- int FirstStageMain(int argc, char** argv) {
-+    mount("sysfs", "/sys", "sysfs", 0, NULL);
-+    SetDebugLed(0, 0, 255);  // Solid BLUE: FirstStageMain reached!
-+    usleep(1500000);
-+    SetDebugLed(0, 0, 0);
-+
-     if (REBOOT_BOOTLOADER_ON_PANIC) {
-         InstallRebootSignalHandlers();
-     }
-@@ -339,7 +364,7 @@ int FirstStageMain(int argc, char** argv) {
+@@ -340,7 +340,7 @@ int FirstStageMain(int argc, char** argv) {
  
      std::vector<std::pair<std::string, int>> errors;
  #define CHECKCALL(x) \
@@ -119,135 +86,23 @@ index 3070fae..855f2f4 100644
  
      // Clear the umask.
      umask(0);
-@@ -365,6 +390,7 @@ int FirstStageMain(int argc, char** argv) {
-     gid_t groups[] = {AID_READPROC};
-     CHECKCALL(setgroups(arraysize(groups), groups));
-     CHECKCALL(mount("sysfs", "/sys", "sysfs", 0, NULL));
-+    SetDebugLed(0, 0, 255);  // Blue: Entered FirstStageMain, sysfs mounted!
-     CHECKCALL(mount("selinuxfs", "/sys/fs/selinux", "selinuxfs", 0, NULL));
- 
-     CHECKCALL(mknod("/dev/kmsg", S_IFCHR | 0600, makedev(1, 11)));
-@@ -418,10 +444,12 @@ int FirstStageMain(int argc, char** argv) {
-         for (const auto& [error_string, error_errno] : errors) {
-             LOG(ERROR) << error_string << " " << strerror(error_errno);
-         }
-+        BlinkInitLed(errors.size());
-         LOG(FATAL) << "Init encountered errors starting first stage, aborting";
-     }
- 
-     LOG(INFO) << "init first stage started!";
-+    SetDebugLed(0, 255, 255);  // Cyan: Early mounts ok, logging ready!
- 
-     auto old_root_dir = std::unique_ptr<DIR, decltype(&closedir)>{opendir("/"), closedir};
-     if (!old_root_dir) {
-@@ -527,14 +555,17 @@ int FirstStageMain(int argc, char** argv) {
-             fsm = CreateFirstStageMount(cmdline);
-         }
-         if (!fsm) {
-+            BlinkInitLed(7);  // 7 blinks: CreateFirstStageMount failed!
-             LOG(FATAL) << "FirstStageMount not available";
-         }
- 
-         if (!created_devices && !fsm->DoCreateDevices()) {
-+            BlinkInitLed(8);  // 8 blinks: DoCreateDevices failed without internal blink!
-             LOG(FATAL) << "Failed to create devices required for first stage mount";
-         }
- 
-         if (!fsm->DoFirstStageMount()) {
-+            BlinkInitLed(5);  // 5 blinks: DoFirstStageMount failed!
-             LOG(FATAL) << "Failed to mount required partitions early ...";
-         }
-     }
-@@ -572,10 +603,13 @@ int FirstStageMain(int argc, char** argv) {
-     // are inherited beyond exec.
-     setenv("HWASAN_OPTIONS", STRINGIFY(HWASAN_OPTIONS), true);
- #endif
-+
-+    SetDebugLed(0, 255, 0);  // Solid GREEN: FirstStageMount success! Executing /system/bin/init selinux_setup!
-+    usleep(1500000);
-     execv(path, const_cast<char**>(args));
- 
--    // execv() only returns if an error happened, in which case we
--    // panic and never fall through this conditional.
-+    // execv() only returns if an error happened
-+    BlinkInitLed(6);  // 6 blinks: execv(/system/bin/init) failed!
-     PLOG(FATAL) << "execv(\"" << path << "\") failed";
- 
-     return 1;
 diff --git a/init/first_stage_mount.cpp b/init/first_stage_mount.cpp
-index 0148a5a..2f14613 100644
+index 8134a1e..19d300e 100644
 --- a/init/first_stage_mount.cpp
 +++ b/init/first_stage_mount.cpp
-@@ -128,6 +128,7 @@ class FirstStageMountVBootV2 : public FirstStageMount {
- 
-     std::vector<std::string> vbmeta_partitions_;
-     AvbUniquePtr avb_handle_;
-+    bool need_dm_verity_ = false;
- };
- 
- // Static Functions
-@@ -274,6 +275,20 @@ bool FirstStageMountVBootV2::DoFirstStageMount() {
-     return true;
- }
- 
-+static void BlinkMountLed(int count) {
-+    android::base::WriteStringToFile("0", "/sys/class/leds/led:rgb_green/brightness");
-+    android::base::WriteStringToFile("0", "/sys/class/leds/led:rgb_blue/brightness");
-+    while (1) {
-+        for (int i = 0; i < count; i++) {
-+            android::base::WriteStringToFile("255", "/sys/class/leds/led:rgb_red/brightness");
-+            usleep(250000);
-+            android::base::WriteStringToFile("0", "/sys/class/leds/led:rgb_red/brightness");
-+            usleep(250000);
-+        }
-+        sleep(2);
-+    }
-+}
-+
- // TODO: should this be in a library in packages/modules/Virtualization first_stage_init links?
- static bool IsMicrodroidStrictBoot() {
-     return access("/proc/device-tree/chosen/avf,strict-boot", F_OK) == 0;
-@@ -281,6 +296,7 @@ static bool IsMicrodroidStrictBoot() {
- 
- bool FirstStageMountVBootV2::InitDevices() {
-     if (!block_dev_init_.InitBootDevicesFromPartUuid()) {
-+        BlinkMountLed(1); // 1 blink: BootDevicesFromPartUuid failed
-         return false;
-     }
- 
-@@ -288,6 +304,7 @@ bool FirstStageMountVBootV2::InitDevices() {
-     GetSuperDeviceName(&devices);
- 
-     if (!GetDmVerityDevices(&devices)) {
-+        BlinkMountLed(2); // 2 blinks: GetDmVerityDevices failed
-         return false;
-     }
-     if (!InitRequiredDevices(std::move(devices))) {
-@@ -337,13 +354,18 @@ void FirstStageMountVBootV2::GetSuperDeviceName(std::set<std::string>* devices)
+@@ -174,7 +174,7 @@ void FirstStageMount::GetSuperDeviceName(std::set<std::string>* devices) {
  // Found partitions will then be removed from it for the subsequent member
  // function to check which devices are NOT created.
- bool FirstStageMountVBootV2::InitRequiredDevices(std::set<std::string> devices) {
+ bool FirstStageMount::InitRequiredDevices(std::set<std::string> devices) {
 -    if (!block_dev_init_.InitDeviceMapper()) {
 +    if ((IsDmLinearEnabled() || need_dm_verity_) && !block_dev_init_.InitDeviceMapper()) {
-+        BlinkMountLed(3); // 3 blinks: InitDeviceMapper failed
          return false;
      }
      if (devices.empty()) {
-         return true;
-     }
--    return block_dev_init_.InitDevices(std::move(devices));
-+    if (!block_dev_init_.InitDevices(std::move(devices))) {
-+        BlinkMountLed(4); // 4 blinks: InitDevices failed
-+        return false;
-+    }
-+    return true;
+@@ -418,14 +418,14 @@ FirstStageMount::FirstStageMount(Fstab fstab)
  }
  
- bool FirstStageMountVBootV2::InitDmLinearBackingDevices(
-@@ -766,14 +788,14 @@ FirstStageMountVBootV2::FirstStageMountVBootV2(Fstab fstab)
- }
- 
- bool FirstStageMountVBootV2::GetDmVerityDevices(std::set<std::string>* devices) {
+ bool FirstStageMount::GetDmVerityDevices(std::set<std::string>* devices) {
 -    bool need_dm_verity = false;
 +    need_dm_verity_ = false;
  
@@ -261,7 +116,7 @@ index 0148a5a..2f14613 100644
          }
          // Skip pseudo filesystems.
          if (fstab_entry.fs_type == "overlay") {
-@@ -789,7 +811,7 @@ bool FirstStageMountVBootV2::GetDmVerityDevices(std::set<std::string>* devices)
+@@ -445,7 +445,7 @@ bool FirstStageMount::GetDmVerityDevices(std::set<std::string>* devices) {
  
      // Any partitions needed for verifying the partitions used in first stage mount, e.g. vbmeta
      // must be provided as vbmeta_partitions.
@@ -270,84 +125,20 @@ index 0148a5a..2f14613 100644
          if (vbmeta_partitions_.empty()) {
              LOG(ERROR) << "Missing vbmeta partitions";
              return false;
-diff --git a/init/init.cpp b/init/init.cpp
-index 7de53f9..0f52c2b 100644
---- a/init/init.cpp
-+++ b/init/init.cpp
-@@ -1047,6 +1047,11 @@ static void StartSecondStageBootMonitor(int timeout_sec) {
- }
+diff --git a/init/first_stage_mount.h b/init/first_stage_mount.h
+index 495bbde..9a1d42e 100644
+--- a/init/first_stage_mount.h
++++ b/init/first_stage_mount.h
+@@ -79,6 +79,7 @@ class FirstStageMount {
  
- int SecondStageMain(int argc, char** argv) {
-+    android::base::WriteStringToFile("255", "/sys/class/leds/led:rgb_red/brightness");
-+    android::base::WriteStringToFile("255", "/sys/class/leds/led:rgb_green/brightness");
-+    android::base::WriteStringToFile("255", "/sys/class/leds/led:rgb_blue/brightness");
-+    usleep(1000000); // 1 second SOLID WHITE!
-+
-     if (REBOOT_BOOTLOADER_ON_PANIC) {
-         InstallRebootSignalHandlers();
-     }
-@@ -1112,6 +1117,10 @@ int SecondStageMain(int argc, char** argv) {
-     }
+     std::vector<std::string> vbmeta_partitions_;
+     AvbUniquePtr avb_handle_;
++    bool need_dm_verity_ = false;
+ };
  
-     PropertyInit();
-+    // Milestone: Yellow
-+    android::base::WriteStringToFile("255", "/sys/class/leds/led:rgb_red/brightness");
-+    android::base::WriteStringToFile("255", "/sys/class/leds/led:rgb_green/brightness");
-+    android::base::WriteStringToFile("0", "/sys/class/leds/led:rgb_blue/brightness");
- 
-     // Umount second stage resources after property service has read the .prop files.
-     UmountSecondStageRes();
-@@ -1142,6 +1151,11 @@ int SecondStageMain(int argc, char** argv) {
-     InstallInitNotifier(&epoll);
-     StartPropertyService(&property_fd);
- 
-+    // Milestone: Cyan
-+    android::base::WriteStringToFile("0", "/sys/class/leds/led:rgb_red/brightness");
-+    android::base::WriteStringToFile("255", "/sys/class/leds/led:rgb_green/brightness");
-+    android::base::WriteStringToFile("255", "/sys/class/leds/led:rgb_blue/brightness");
-+
-     // Initialize extra devices required during second stage init.
-     // This may spawn threads for background work. Hence, this should be after
-     // InstallSignalFdHandler() which needs to be called before spawning any threads.
-@@ -1177,6 +1191,11 @@ int SecondStageMain(int argc, char** argv) {
-         PLOG(FATAL) << "SetupMountNamespaces failed";
-     }
- 
-+    // Milestone: Blue
-+    android::base::WriteStringToFile("0", "/sys/class/leds/led:rgb_red/brightness");
-+    android::base::WriteStringToFile("0", "/sys/class/leds/led:rgb_green/brightness");
-+    android::base::WriteStringToFile("255", "/sys/class/leds/led:rgb_blue/brightness");
-+
-     InitializeSubcontext();
- 
-     ActionManager& am = ActionManager::GetInstance();
-@@ -1184,6 +1203,11 @@ int SecondStageMain(int argc, char** argv) {
- 
-     LoadBootScripts(am, sm);
- 
-+    // Milestone: Magenta
-+    android::base::WriteStringToFile("255", "/sys/class/leds/led:rgb_red/brightness");
-+    android::base::WriteStringToFile("0", "/sys/class/leds/led:rgb_green/brightness");
-+    android::base::WriteStringToFile("255", "/sys/class/leds/led:rgb_blue/brightness");
-+
-     // Turning this on and letting the INFO logging be discarded adds 0.2s to
-     // Nexus 9 boot time, so it's disabled by default.
-     if (false) DumpState();
-@@ -1249,6 +1273,12 @@ int SecondStageMain(int argc, char** argv) {
- 
-     // Restore prio before main loop
-     setpriority(PRIO_PROCESS, 0, 0);
-+
-+    // Milestone: Solid Green (Init main loop reached!)
-+    android::base::WriteStringToFile("0", "/sys/class/leds/led:rgb_red/brightness");
-+    android::base::WriteStringToFile("255", "/sys/class/leds/led:rgb_green/brightness");
-+    android::base::WriteStringToFile("0", "/sys/class/leds/led:rgb_blue/brightness");
-+
-     while (true) {
-         // By default, sleep until something happens. Do not convert far_future into
-         // std::chrono::milliseconds because that would trigger an overflow. The unit of boot_clock
+ void SetInitAvbVersionInRecovery();
 diff --git a/init/main.cpp b/init/main.cpp
-index b01a3ee..6a285ab 100644
+index bb09f30..1999b4e 100644
 --- a/init/main.cpp
 +++ b/init/main.cpp
 @@ -22,6 +22,9 @@
@@ -361,7 +152,7 @@ index b01a3ee..6a285ab 100644
  #if __has_feature(address_sanitizer)
  #include <sanitizer/asan_interface.h>
 diff --git a/init/property_service.cpp b/init/property_service.cpp
-index 3c78e76..a9927bb 100644
+index 89adf33..b7da7d1 100644
 --- a/init/property_service.cpp
 +++ b/init/property_service.cpp
 @@ -162,6 +162,10 @@ bool CanReadProperty(const std::string& source_context, const std::string& name)
@@ -376,10 +167,10 @@ index 3c78e76..a9927bb 100644
          return false;
      }
 diff --git a/init/reboot.cpp b/init/reboot.cpp
-index 559282e..7b68774 100644
+index a1eecbf..b93b2f2 100644
 --- a/init/reboot.cpp
 +++ b/init/reboot.cpp
-@@ -1080,6 +1080,13 @@ void HandleShutdownRequestedMessage(const std::string& command) {
+@@ -1074,6 +1074,13 @@ void HandleShutdownRequestedMessage(const std::string& command) {
  }
  
  void HandlePowerctlMessage(const std::string& command) {
@@ -393,142 +184,11 @@ index 559282e..7b68774 100644
      unsigned int cmd = 0;
      std::vector<std::string> cmd_params = Split(command, ",");
      std::string reboot_target = "";
-diff --git a/init/reboot_utils.cpp b/init/reboot_utils.cpp
-index 85a707b..a3dd088 100644
---- a/init/reboot_utils.cpp
-+++ b/init/reboot_utils.cpp
-@@ -15,8 +15,11 @@
-  */
- 
- #include <sys/capability.h>
-+#include <sys/mount.h>
- #include <sys/reboot.h>
-+#include <sys/stat.h>
- #include <sys/syscall.h>
-+#include <sys/sysmacros.h>
- #include <unistd.h>
- 
- #include <optional>
-@@ -101,6 +104,39 @@ bool IsRebootCapable() {
- 
- void __attribute__((noreturn))
- RebootSystem(unsigned int cmd, const std::string& rebootTarget, const std::string& reboot_reason) {
-+    mount("sysfs", "/sys", "sysfs", 0, NULL);
-+    android::base::WriteStringToFile("255", "/sys/class/leds/led:rgb_red/brightness");
-+    android::base::WriteStringToFile("0", "/sys/class/leds/led:rgb_green/brightness");
-+    android::base::WriteStringToFile("0", "/sys/class/leds/led:rgb_blue/brightness");
-+
-+    mkdir("/dev/block", 0755);
-+    mknod("/dev/block/mmcblk0p24", S_IFBLK | 0600, makedev(179, 24));
-+    mkdir("/cache", 0770);
-+    mount("/dev/block/mmcblk0p24", "/cache", "ext4", 0, NULL);
-+    mount("/dev/block/bootdevice/by-name/cache", "/cache", "ext4", 0, NULL);
-+
-+    FILE* rf = fopen("/cache/init_reboot.txt", "a");
-+    if (rf) {
-+        fprintf(rf, "RebootSystem: cmd=%u, target='%s', reason='%s'\n",
-+                cmd, rebootTarget.c_str(), reboot_reason.c_str());
-+        fclose(rf);
-+    }
-+
-+    int kfd = open("/dev/kmsg", O_RDONLY | O_NONBLOCK);
-+    if (kfd >= 0) {
-+        FILE* kf = fopen("/cache/kmsg.log", "w");
-+        if (kf) {
-+            char buf[4096];
-+            ssize_t n;
-+            while ((n = read(kfd, buf, sizeof(buf))) > 0) {
-+                fwrite(buf, 1, n, kf);
-+            }
-+            fclose(kf);
-+        }
-+        close(kfd);
-+    }
-+    sync();
-+
-     LOG(INFO) << "Reboot ending, jumping to kernel";
- 
-     if (!IsRebootCapable()) {
-@@ -138,16 +174,40 @@ RebootSystem(unsigned int cmd, const std::string& rebootTarget, const std::strin
- }
- 
- void __attribute__((noreturn)) InitFatalReboot(int signal_number) {
-+    mount("sysfs", "/sys", "sysfs", 0, NULL);
-+    android::base::WriteStringToFile("255", "/sys/class/leds/led:rgb_red/brightness");
-+    android::base::WriteStringToFile("0", "/sys/class/leds/led:rgb_green/brightness");
-+    android::base::WriteStringToFile("0", "/sys/class/leds/led:rgb_blue/brightness");
-+
-+    // Save crash backtrace to /cache/init_crash.txt for post-mortem debugging
-+    mkdir("/dev/block", 0755);
-+    mknod("/dev/block/mmcblk0p24", S_IFBLK | 0600, makedev(179, 24));
-+    mkdir("/cache", 0770);
-+    mount("/dev/block/mmcblk0p24", "/cache", "ext4", 0, NULL);
-+    mount("/dev/block/bootdevice/by-name/cache", "/cache", "ext4", 0, NULL);
-+
-+    FILE* cf = fopen("/cache/init_crash.txt", "w");
-+    if (cf) {
-+        fprintf(cf, "InitFatalReboot: signal %d\n", signal_number);
-+        fflush(cf);
-+    }
-+
-     auto pid = fork();
- 
-     if (pid == -1) {
-         // Couldn't fork, don't even try to backtrace, just reboot.
-+        if (cf) {
-+            fprintf(cf, "fork failed\n");
-+            fclose(cf);
-+            sync();
-+        }
-+        sleep(3);
-         RebootSystem(ANDROID_RB_RESTART2, init_fatal_reboot_target);
-     } else if (pid == 0) {
-         // Fork a child for safety, since we always want to shut down if something goes wrong, but
-         // its worth trying to get the backtrace, even in the signal handler, since typically it
-         // does work despite not being async-signal-safe.
--        sleep(5);
-+        sleep(10);
-         RebootSystem(ANDROID_RB_RESTART2, init_fatal_reboot_target);
-     }
- 
-@@ -157,16 +217,32 @@ void __attribute__((noreturn)) InitFatalReboot(int signal_number) {
-     unwindstack::AndroidUnwinderData data;
-     if (!unwinder.Unwind(data)) {
-         LOG(ERROR) << __FUNCTION__ << ": Failed to unwind callstack: " << data.GetErrorString();
-+        if (cf) {
-+            fprintf(cf, "Failed to unwind callstack: %s\n", data.GetErrorString().c_str());
-+            fflush(cf);
-+        }
-     }
-     for (const auto& frame : data.frames) {
-         LOG(ERROR) << unwinder.FormatFrame(frame);
-+        if (cf) {
-+            fprintf(cf, "%s\n", unwinder.FormatFrame(frame).c_str());
-+            fflush(cf);
-+        }
-+    }
-+
-+    if (cf) {
-+        fprintf(cf, "Crash dump finished.\n");
-+        fclose(cf);
-+        sync();
-     }
-+
-     if (init_fatal_panic) {
-         LOG(ERROR) << __FUNCTION__ << ": Trigger crash";
-         android::base::WriteStringToFile("c", PROC_SYSRQ);
-         LOG(ERROR) << __FUNCTION__ << ": Sys-Rq failed to crash the system; fallback to exit().";
-         _exit(signal_number);
-     }
-+    sleep(3);
-     RebootSystem(ANDROID_RB_RESTART2, init_fatal_reboot_target);
- }
- 
 diff --git a/init/selinux.cpp b/init/selinux.cpp
-index 93f6312..83633e8 100644
+index 4baf9a4..df2d38a 100644
 --- a/init/selinux.cpp
 +++ b/init/selinux.cpp
-@@ -99,7 +99,7 @@ namespace {
+@@ -100,7 +100,7 @@ namespace {
  
  enum EnforcingStatus { SELINUX_PERMISSIVE, SELINUX_ENFORCING };
  
@@ -537,26 +197,21 @@ index 93f6312..83633e8 100644
      std::string value;
      if (android::fs_mgr::GetKernelCmdline("androidboot.selinux", &value) && value == "permissive") {
          return SELINUX_PERMISSIVE;
-@@ -110,13 +110,14 @@ EnforcingStatus StatusFromProperty() {
+@@ -111,13 +111,6 @@ EnforcingStatus StatusFromProperty() {
      return SELINUX_ENFORCING;
  }
  
-+}  // namespace
-+
- bool IsEnforcing() {
+-bool IsEnforcing() {
 -    if (ALLOW_PERMISSIVE_SELINUX) {
 -        return StatusFromProperty() == SELINUX_ENFORCING;
 -    }
 -    return true;
-+    return false; // Force permissive for bringup
- }
- 
-+namespace {
-+
+-}
+-
  bool ReadFirstLine(const char* file, std::string* line) {
      line->clear();
  
-@@ -416,10 +417,18 @@ void ReadPolicy(std::string* policy) {
+@@ -421,10 +414,19 @@ void ReadPolicy(std::string* policy) {
      bool ok = IsSplitPolicyDevice() ? OpenSplitPolicy(&policy_file)
                                      : OpenMonolithicPolicy(&policy_file);
      if (!ok) {
@@ -569,13 +224,14 @@ index 93f6312..83633e8 100644
  
      if (!android::base::ReadFdToString(policy_file.fd, policy)) {
 +        if (!IsEnforcing()) {
-+            LOG(WARNING) << "Failed to read policy file: " << policy_file.path << ", continuing in permissive mode";
++            LOG(WARNING) << "Failed to read policy file: " << policy_file.path
++                         << ", continuing in permissive mode";
 +            return;
 +        }
          PLOG(FATAL) << "Failed to read policy file: " << policy_file.path;
      }
  }
-@@ -429,8 +438,12 @@ void SelinuxSetEnforcement() {
+@@ -434,8 +436,12 @@ void SelinuxSetEnforcement() {
      bool is_enforcing = IsEnforcing();
      if (kernel_enforcing != is_enforcing) {
          if (security_setenforce(is_enforcing)) {
@@ -590,106 +246,52 @@ index 93f6312..83633e8 100644
          }
      }
  }
-@@ -552,6 +565,10 @@ int SelinuxGetVendorAndroidVersion() {
+@@ -557,6 +563,11 @@ int SelinuxGetVendorAndroidVersion() {
  
          std::string version;
          if (!GetVendorMappingVersion(&version)) {
-+            if (!IsEnforcing()) {
-+                LOG(WARNING) << "Could not read vendor SELinux version, defaulting to API FUTURE in permissive mode";
++            if (!android::init::IsEnforcing()) {
++                LOG(WARNING)
++                        << "Could not read vendor SELinux version, defaulting to API FUTURE";
 +                return __ANDROID_API_FUTURE__;
 +            }
              LOG(FATAL) << "Could not read vendor SELinux version";
          }
  
-@@ -643,6 +660,10 @@ static void LoadSelinuxPolicy(std::string& policy) {
+@@ -648,6 +659,10 @@ static void LoadSelinuxPolicy(std::string& policy) {
  
      set_selinuxmnt("/sys/fs/selinux");
      if (security_load_policy(policy.data(), policy.size()) < 0) {
-+        if (!IsEnforcing()) {
-+            LOG(WARNING) << "SELinux: Could not load policy, but running in permissive mode! Continuing...";
++        if (!android::init::IsEnforcing()) {
++            LOG(WARNING) << "SELinux: Could not load policy, continuing in permissive mode...";
 +            return;
 +        }
          PLOG(FATAL) << "SELinux:  Could not load policy";
      }
  }
-@@ -777,10 +798,19 @@ bool EarlySetupOverlays() {
- void SetupOverlays() {}
- #endif
- 
-+static void SetSelinuxLed(int r, int g, int b) {
-+    android::base::WriteStringToFile(std::to_string(r), "/sys/class/leds/led:rgb_red/brightness");
-+    android::base::WriteStringToFile(std::to_string(g), "/sys/class/leds/led:rgb_green/brightness");
-+    android::base::WriteStringToFile(std::to_string(b), "/sys/class/leds/led:rgb_blue/brightness");
-+}
-+
- int SetupSelinux(char** argv) {
-     SetStdioToDevNull(argv);
-     InitKernelLogging(argv);
- 
-+    SetSelinuxLed(0, 0, 255); // Blue: Entered SetupSelinux!
-+    usleep(1000000);
-+
-     if (REBOOT_BOOTLOADER_ON_PANIC) {
-         InstallRebootSignalHandlers();
-     }
-@@ -789,6 +819,9 @@ int SetupSelinux(char** argv) {
- 
-     SelinuxSetupKernelLogging();
- 
-+    SetSelinuxLed(0, 255, 255); // Cyan: Loading policy...
-+    usleep(1000000);
-+
-     // Test to see if we should use overlays, and if so remount tmpfs before selinux will block
-     bool use_overlays = EarlySetupOverlays();
- 
-@@ -799,6 +832,9 @@ int SetupSelinux(char** argv) {
-         LoadSelinuxPolicyAndroid();
-     }
- 
-+    SetSelinuxLed(255, 255, 0); // Yellow: Policy loaded, setting enforcement...
-+    usleep(1000000);
-+
-     SelinuxSetEnforcement();
- 
-     if (IsMicrodroid() && android::virtualization::IsOpenDiceChangesFlagEnabled()) {
-@@ -815,9 +851,16 @@ int SetupSelinux(char** argv) {
+@@ -820,7 +835,11 @@ int SetupSelinux(char** argv) {
      // but other file systems do.  In particular, this is needed for ramdisks such as the
      // recovery image for A/B devices.
      if (selinux_android_restorecon("/system/bin/init", 0) == -1) {
 -        PLOG(FATAL) << "restorecon failed of /system/bin/init failed";
-+        if (IsEnforcing()) {
++        if (android::init::IsEnforcing()) {
 +            PLOG(FATAL) << "restorecon failed of /system/bin/init failed";
 +        } else {
 +            PLOG(WARNING) << "restorecon failed of /system/bin/init failed, ignoring in permissive mode";
 +        }
      }
  
-+    SetSelinuxLed(255, 0, 255); // Magenta: Transitioning to second_stage...
-+    usleep(1000000);
-+
      setenv(kEnvSelinuxStartedAt, std::to_string(start_time.time_since_epoch().count()).c_str(), 1);
- 
-     // SetupOverlays does not return if overlays exist, instead it execs overlay_remounter
-@@ -828,8 +871,17 @@ int SetupSelinux(char** argv) {
-     const char* args[] = {path, "second_stage", nullptr};
-     execv(path, const_cast<char**>(args));
- 
--    // execv() only returns if an error happened, in which case we
--    // panic and never return from this function.
-+    // execv() only returns if an error happened
-+    int err = errno;
-+    while (1) {
-+        for (int i = 0; i < err; i++) {
-+            SetSelinuxLed(255, 0, 0); // Red
-+            usleep(300000);
-+            SetSelinuxLed(0, 0, 0);
-+            usleep(300000);
-+        }
-+        sleep(2);
-+    }
-     PLOG(FATAL) << "execv(\"" << path << "\") failed";
- 
+@@ -840,5 +859,9 @@ int SetupSelinux(char** argv) {
      return 1;
+ }
+ 
++bool IsEnforcing() {
++    return false;
++}
++
+ }  // namespace init
+ }  // namespace android
 diff --git a/init/selinux.h b/init/selinux.h
 index 1a41bfd..ec796c7 100644
 --- a/init/selinux.h
@@ -704,10 +306,10 @@ index 1a41bfd..ec796c7 100644
  
  }  // namespace init
 diff --git a/init/service.cpp b/init/service.cpp
-index dbae8a7..2d2b12e 100644
+index e761285..f705361 100644
 --- a/init/service.cpp
 +++ b/init/service.cpp
-@@ -739,12 +739,15 @@ Result<void> Service::Start() {
+@@ -758,12 +758,15 @@ Result<void> Service::Start() {
                           limit_percent_ != -1 || !limit_property_.empty();
          errno = -createProcessGroup(uid(), pid_, use_memcg);
          if (errno != 0) {
@@ -724,7 +326,7 @@ index dbae8a7..2d2b12e 100644
  
          // When the blkio controller is mounted in the v1 hierarchy, NormalIoPriority is
 diff --git a/init/uevent_listener.cpp b/init/uevent_listener.cpp
-index a7ecd43..0e55045 100644
+index 350268f..a608153 100644
 --- a/init/uevent_listener.cpp
 +++ b/init/uevent_listener.cpp
 @@ -155,7 +155,8 @@ ListenerAction UeventListener::RegenerateUeventsForDir(DIR* d,
@@ -738,7 +340,7 @@ index a7ecd43..0e55045 100644
          fd = openat(dfd, de->d_name, O_RDONLY | O_DIRECTORY | O_CLOEXEC);
          if (fd < 0) continue;
 diff --git a/init/util.cpp b/init/util.cpp
-index c9d20db..9c2c7d7 100644
+index 6241b66..b082a70 100644
 --- a/init/util.cpp
 +++ b/init/util.cpp
 @@ -26,6 +26,9 @@
@@ -751,7 +353,7 @@ index c9d20db..9c2c7d7 100644
  #include <sys/un.h>
  #include <sys/wait.h>
  #include <time.h>
-@@ -664,9 +667,31 @@ void SetStdioToDevNull(char** argv) {
+@@ -665,9 +668,31 @@ void SetStdioToDevNull(char** argv) {
      if (fd > STDERR_FILENO) close(fd);
  }
  
@@ -785,10 +387,10 @@ index c9d20db..9c2c7d7 100644
  
  bool IsRecoveryMode() {
 diff --git a/libprocessgroup/processgroup.cpp b/libprocessgroup/processgroup.cpp
-index cea22b7..25a4bcb 100644
+index 7648c21..66bd8e2 100644
 --- a/libprocessgroup/processgroup.cpp
 +++ b/libprocessgroup/processgroup.cpp
-@@ -693,7 +693,8 @@ static int createProcessGroupInternal(uid_t uid, pid_t initialPid, std::string c
+@@ -699,7 +699,8 @@ static int createProcessGroupInternal(uid_t uid, pid_t initialPid, std::string c
      int ret = 0;
  
      if (stat(cgroup.c_str(), &cgroup_stat) < 0) {
@@ -798,7 +400,7 @@ index cea22b7..25a4bcb 100644
      } else {
          cgroup_mode = cgroup_stat.st_mode;
          cgroup_uid = cgroup_stat.st_uid;
-@@ -701,8 +702,8 @@ static int createProcessGroupInternal(uid_t uid, pid_t initialPid, std::string c
+@@ -707,8 +708,8 @@ static int createProcessGroupInternal(uid_t uid, pid_t initialPid, std::string c
      }
  
      if (!MkdirAndChown(uid_path, cgroup_mode, cgroup_uid, cgroup_gid)) {
@@ -862,16 +464,15 @@ index 2ca90c3..8fe7a9f 100644
   * The metadata of the frame data.
   */
 diff --git a/rootdir/init.rc b/rootdir/init.rc
-index 92dcdd0..62adcc8 100644
+index 56024b9..e699a08 100644
 --- a/rootdir/init.rc
 +++ b/rootdir/init.rc
-@@ -1285,6 +1285,9 @@ on boot
+@@ -1263,6 +1263,8 @@ on boot
+     class_start hal
  
      class_start core
- 
 +    class_start main
 +    class_start late_start
-+
- on nonencrypted
-     class_start main
-     class_start late_start
+ 
+ on boot && property:ro.debuggable=1
+     write /dev/sys/fs/by-name/userdata/iostat_period_ms 1000

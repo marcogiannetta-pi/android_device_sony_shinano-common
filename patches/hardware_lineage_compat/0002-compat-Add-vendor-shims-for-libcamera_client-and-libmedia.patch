@@ -1,8 +1,8 @@
 diff --git a/Android.bp b/Android.bp
-index e57d86e..e3cc321 100644
+index 3c477f2..9dc9329 100644
 --- a/Android.bp
 +++ b/Android.bp
-@@ -956,3 +956,28 @@ java_library {
+@@ -1042,3 +1042,28 @@ java_library {
          "frameworks/telephony-common-stub/src/**/*.java",
      ],
  }
@@ -31,3 +31,4135 @@ index e57d86e..e3cc321 100644
 +        "libutils",
 +    ],
 +}
+diff --git a/camera/CameraParameters.cpp b/camera/CameraParameters.cpp
+new file mode 100644
+index 0000000..afc9dde
+--- /dev/null
++++ b/camera/CameraParameters.cpp
+@@ -0,0 +1,541 @@
++/*
++**
++** Copyright 2008, The Android Open Source Project
++**
++** Licensed under the Apache License, Version 2.0 (the "License");
++** you may not use this file except in compliance with the License.
++** You may obtain a copy of the License at
++**
++**     http://www.apache.org/licenses/LICENSE-2.0
++**
++** Unless required by applicable law or agreed to in writing, software
++** distributed under the License is distributed on an "AS IS" BASIS,
++** WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++** See the License for the specific language governing permissions and
++** limitations under the License.
++*/
++
++#define LOG_TAG "CameraParams"
++#include <utils/Log.h>
++
++#include <string.h>
++#include <stdlib.h>
++#include <unistd.h>
++#include <camera/CameraParameters.h>
++#include <system/graphics.h>
++
++namespace android {
++// Parameter keys to communicate between camera application and driver.
++const char CameraParameters::KEY_PREVIEW_SIZE[] = "preview-size";
++const char CameraParameters::KEY_SUPPORTED_PREVIEW_SIZES[] = "preview-size-values";
++const char CameraParameters::KEY_PREVIEW_FORMAT[] = "preview-format";
++const char CameraParameters::KEY_SUPPORTED_PREVIEW_FORMATS[] = "preview-format-values";
++const char CameraParameters::KEY_PREVIEW_FRAME_RATE[] = "preview-frame-rate";
++const char CameraParameters::KEY_SUPPORTED_PREVIEW_FRAME_RATES[] = "preview-frame-rate-values";
++const char CameraParameters::KEY_PREVIEW_FPS_RANGE[] = "preview-fps-range";
++const char CameraParameters::KEY_SUPPORTED_PREVIEW_FPS_RANGE[] = "preview-fps-range-values";
++const char CameraParameters::KEY_PICTURE_SIZE[] = "picture-size";
++const char CameraParameters::KEY_SUPPORTED_PICTURE_SIZES[] = "picture-size-values";
++const char CameraParameters::KEY_PICTURE_FORMAT[] = "picture-format";
++const char CameraParameters::KEY_SUPPORTED_PICTURE_FORMATS[] = "picture-format-values";
++const char CameraParameters::KEY_JPEG_THUMBNAIL_WIDTH[] = "jpeg-thumbnail-width";
++const char CameraParameters::KEY_JPEG_THUMBNAIL_HEIGHT[] = "jpeg-thumbnail-height";
++const char CameraParameters::KEY_SUPPORTED_JPEG_THUMBNAIL_SIZES[] = "jpeg-thumbnail-size-values";
++const char CameraParameters::KEY_JPEG_THUMBNAIL_QUALITY[] = "jpeg-thumbnail-quality";
++const char CameraParameters::KEY_JPEG_QUALITY[] = "jpeg-quality";
++const char CameraParameters::KEY_ROTATION[] = "rotation";
++const char CameraParameters::KEY_GPS_LATITUDE[] = "gps-latitude";
++const char CameraParameters::KEY_GPS_LONGITUDE[] = "gps-longitude";
++const char CameraParameters::KEY_GPS_ALTITUDE[] = "gps-altitude";
++const char CameraParameters::KEY_GPS_TIMESTAMP[] = "gps-timestamp";
++const char CameraParameters::KEY_GPS_PROCESSING_METHOD[] = "gps-processing-method";
++const char CameraParameters::KEY_WHITE_BALANCE[] = "whitebalance";
++const char CameraParameters::KEY_SUPPORTED_WHITE_BALANCE[] = "whitebalance-values";
++const char CameraParameters::KEY_EFFECT[] = "effect";
++const char CameraParameters::KEY_SUPPORTED_EFFECTS[] = "effect-values";
++const char CameraParameters::KEY_ANTIBANDING[] = "antibanding";
++const char CameraParameters::KEY_SUPPORTED_ANTIBANDING[] = "antibanding-values";
++const char CameraParameters::KEY_SCENE_MODE[] = "scene-mode";
++const char CameraParameters::KEY_SUPPORTED_SCENE_MODES[] = "scene-mode-values";
++const char CameraParameters::KEY_FLASH_MODE[] = "flash-mode";
++const char CameraParameters::KEY_SUPPORTED_FLASH_MODES[] = "flash-mode-values";
++const char CameraParameters::KEY_FOCUS_MODE[] = "focus-mode";
++const char CameraParameters::KEY_SUPPORTED_FOCUS_MODES[] = "focus-mode-values";
++const char CameraParameters::KEY_MAX_NUM_FOCUS_AREAS[] = "max-num-focus-areas";
++const char CameraParameters::KEY_FOCUS_AREAS[] = "focus-areas";
++const char CameraParameters::KEY_FOCAL_LENGTH[] = "focal-length";
++const char CameraParameters::KEY_HORIZONTAL_VIEW_ANGLE[] = "horizontal-view-angle";
++const char CameraParameters::KEY_VERTICAL_VIEW_ANGLE[] = "vertical-view-angle";
++const char CameraParameters::KEY_EXPOSURE_COMPENSATION[] = "exposure-compensation";
++const char CameraParameters::KEY_MAX_EXPOSURE_COMPENSATION[] = "max-exposure-compensation";
++const char CameraParameters::KEY_MIN_EXPOSURE_COMPENSATION[] = "min-exposure-compensation";
++const char CameraParameters::KEY_EXPOSURE_COMPENSATION_STEP[] = "exposure-compensation-step";
++const char CameraParameters::KEY_AUTO_EXPOSURE_LOCK[] = "auto-exposure-lock";
++const char CameraParameters::KEY_AUTO_EXPOSURE_LOCK_SUPPORTED[] = "auto-exposure-lock-supported";
++const char CameraParameters::KEY_AUTO_WHITEBALANCE_LOCK[] = "auto-whitebalance-lock";
++const char CameraParameters::KEY_AUTO_WHITEBALANCE_LOCK_SUPPORTED[] = "auto-whitebalance-lock-supported";
++const char CameraParameters::KEY_MAX_NUM_METERING_AREAS[] = "max-num-metering-areas";
++const char CameraParameters::KEY_METERING_AREAS[] = "metering-areas";
++const char CameraParameters::KEY_ZOOM[] = "zoom";
++const char CameraParameters::KEY_MAX_ZOOM[] = "max-zoom";
++const char CameraParameters::KEY_ZOOM_RATIOS[] = "zoom-ratios";
++const char CameraParameters::KEY_ZOOM_SUPPORTED[] = "zoom-supported";
++const char CameraParameters::KEY_SMOOTH_ZOOM_SUPPORTED[] = "smooth-zoom-supported";
++const char CameraParameters::KEY_FOCUS_DISTANCES[] = "focus-distances";
++const char CameraParameters::KEY_VIDEO_FRAME_FORMAT[] = "video-frame-format";
++const char CameraParameters::KEY_VIDEO_SIZE[] = "video-size";
++const char CameraParameters::KEY_SUPPORTED_VIDEO_SIZES[] = "video-size-values";
++const char CameraParameters::KEY_PREFERRED_PREVIEW_SIZE_FOR_VIDEO[] = "preferred-preview-size-for-video";
++const char CameraParameters::KEY_MAX_NUM_DETECTED_FACES_HW[] = "max-num-detected-faces-hw";
++const char CameraParameters::KEY_MAX_NUM_DETECTED_FACES_SW[] = "max-num-detected-faces-sw";
++const char CameraParameters::KEY_RECORDING_HINT[] = "recording-hint";
++const char CameraParameters::KEY_VIDEO_SNAPSHOT_SUPPORTED[] = "video-snapshot-supported";
++const char CameraParameters::KEY_VIDEO_STABILIZATION[] = "video-stabilization";
++const char CameraParameters::KEY_VIDEO_STABILIZATION_SUPPORTED[] = "video-stabilization-supported";
++const char CameraParameters::KEY_LIGHTFX[] = "light-fx";
++
++const char CameraParameters::TRUE[] = "true";
++const char CameraParameters::FALSE[] = "false";
++const char CameraParameters::FOCUS_DISTANCE_INFINITY[] = "Infinity";
++
++// Values for white balance settings.
++const char CameraParameters::WHITE_BALANCE_AUTO[] = "auto";
++const char CameraParameters::WHITE_BALANCE_INCANDESCENT[] = "incandescent";
++const char CameraParameters::WHITE_BALANCE_FLUORESCENT[] = "fluorescent";
++const char CameraParameters::WHITE_BALANCE_WARM_FLUORESCENT[] = "warm-fluorescent";
++const char CameraParameters::WHITE_BALANCE_DAYLIGHT[] = "daylight";
++const char CameraParameters::WHITE_BALANCE_CLOUDY_DAYLIGHT[] = "cloudy-daylight";
++const char CameraParameters::WHITE_BALANCE_TWILIGHT[] = "twilight";
++const char CameraParameters::WHITE_BALANCE_SHADE[] = "shade";
++
++// Values for effect settings.
++const char CameraParameters::EFFECT_NONE[] = "none";
++const char CameraParameters::EFFECT_MONO[] = "mono";
++const char CameraParameters::EFFECT_NEGATIVE[] = "negative";
++const char CameraParameters::EFFECT_SOLARIZE[] = "solarize";
++const char CameraParameters::EFFECT_SEPIA[] = "sepia";
++const char CameraParameters::EFFECT_POSTERIZE[] = "posterize";
++const char CameraParameters::EFFECT_WHITEBOARD[] = "whiteboard";
++const char CameraParameters::EFFECT_BLACKBOARD[] = "blackboard";
++const char CameraParameters::EFFECT_AQUA[] = "aqua";
++
++// Values for antibanding settings.
++const char CameraParameters::ANTIBANDING_AUTO[] = "auto";
++const char CameraParameters::ANTIBANDING_50HZ[] = "50hz";
++const char CameraParameters::ANTIBANDING_60HZ[] = "60hz";
++const char CameraParameters::ANTIBANDING_OFF[] = "off";
++
++// Values for flash mode settings.
++const char CameraParameters::FLASH_MODE_OFF[] = "off";
++const char CameraParameters::FLASH_MODE_AUTO[] = "auto";
++const char CameraParameters::FLASH_MODE_ON[] = "on";
++const char CameraParameters::FLASH_MODE_RED_EYE[] = "red-eye";
++const char CameraParameters::FLASH_MODE_TORCH[] = "torch";
++
++// Values for scene mode settings.
++const char CameraParameters::SCENE_MODE_AUTO[] = "auto";
++const char CameraParameters::SCENE_MODE_ACTION[] = "action";
++const char CameraParameters::SCENE_MODE_PORTRAIT[] = "portrait";
++const char CameraParameters::SCENE_MODE_LANDSCAPE[] = "landscape";
++const char CameraParameters::SCENE_MODE_NIGHT[] = "night";
++const char CameraParameters::SCENE_MODE_NIGHT_PORTRAIT[] = "night-portrait";
++const char CameraParameters::SCENE_MODE_THEATRE[] = "theatre";
++const char CameraParameters::SCENE_MODE_BEACH[] = "beach";
++const char CameraParameters::SCENE_MODE_SNOW[] = "snow";
++const char CameraParameters::SCENE_MODE_SUNSET[] = "sunset";
++const char CameraParameters::SCENE_MODE_STEADYPHOTO[] = "steadyphoto";
++const char CameraParameters::SCENE_MODE_FIREWORKS[] = "fireworks";
++const char CameraParameters::SCENE_MODE_SPORTS[] = "sports";
++const char CameraParameters::SCENE_MODE_PARTY[] = "party";
++const char CameraParameters::SCENE_MODE_CANDLELIGHT[] = "candlelight";
++const char CameraParameters::SCENE_MODE_BARCODE[] = "barcode";
++const char CameraParameters::SCENE_MODE_HDR[] = "hdr";
++
++const char CameraParameters::PIXEL_FORMAT_YUV422SP[] = "yuv422sp";
++const char CameraParameters::PIXEL_FORMAT_YUV420SP[] = "yuv420sp";
++const char CameraParameters::PIXEL_FORMAT_YUV422I[] = "yuv422i-yuyv";
++const char CameraParameters::PIXEL_FORMAT_YUV420P[]  = "yuv420p";
++const char CameraParameters::PIXEL_FORMAT_RGB565[] = "rgb565";
++const char CameraParameters::PIXEL_FORMAT_RGBA8888[] = "rgba8888";
++const char CameraParameters::PIXEL_FORMAT_JPEG[] = "jpeg";
++const char CameraParameters::PIXEL_FORMAT_BAYER_RGGB[] = "bayer-rggb";
++const char CameraParameters::PIXEL_FORMAT_ANDROID_OPAQUE[] = "android-opaque";
++
++// Values for focus mode settings.
++const char CameraParameters::FOCUS_MODE_AUTO[] = "auto";
++const char CameraParameters::FOCUS_MODE_INFINITY[] = "infinity";
++const char CameraParameters::FOCUS_MODE_MACRO[] = "macro";
++const char CameraParameters::FOCUS_MODE_FIXED[] = "fixed";
++const char CameraParameters::FOCUS_MODE_EDOF[] = "edof";
++const char CameraParameters::FOCUS_MODE_CONTINUOUS_VIDEO[] = "continuous-video";
++const char CameraParameters::FOCUS_MODE_CONTINUOUS_PICTURE[] = "continuous-picture";
++
++// Values for light fx settings
++const char CameraParameters::LIGHTFX_LOWLIGHT[] = "low-light";
++const char CameraParameters::LIGHTFX_HDR[] = "high-dynamic-range";
++
++CameraParameters::CameraParameters()
++                : mMap()
++{
++}
++
++CameraParameters::~CameraParameters()
++{
++}
++
++String8 CameraParameters::flatten() const
++{
++    String8 flattened("");
++    size_t size = mMap.size();
++
++    for (size_t i = 0; i < size; i++) {
++        String8 k, v;
++        k = mMap.keyAt(i);
++        v = mMap.valueAt(i);
++
++        flattened += k;
++        flattened += "=";
++        flattened += v;
++        if (i != size-1)
++            flattened += ";";
++    }
++
++    return flattened;
++}
++
++void CameraParameters::unflatten(const String8 &params)
++{
++    const char *a = params.c_str();
++    const char *b;
++
++    mMap.clear();
++
++    for (;;) {
++        // Find the bounds of the key name.
++        b = strchr(a, '=');
++        if (b == 0)
++            break;
++
++        // Create the key string.
++        String8 k(a, (size_t)(b-a));
++
++        // Find the value.
++        a = b+1;
++        b = strchr(a, ';');
++        if (b == 0) {
++            // If there's no semicolon, this is the last item.
++            String8 v(a);
++            mMap.add(k, v);
++            break;
++        }
++
++        String8 v(a, (size_t)(b-a));
++        mMap.add(k, v);
++        a = b+1;
++    }
++}
++
++
++void CameraParameters::set(const char *key, const char *value)
++{
++    if (key == NULL || value == NULL)
++        return;
++
++    // XXX i think i can do this with strspn()
++    if (strchr(key, '=') || strchr(key, ';')) {
++        //XXX ALOGE("Key \"%s\"contains invalid character (= or ;)", key);
++        return;
++    }
++
++    if (strchr(value, '=') || strchr(value, ';')) {
++        //XXX ALOGE("Value \"%s\"contains invalid character (= or ;)", value);
++        return;
++    }
++
++    mMap.replaceValueFor(String8(key), String8(value));
++}
++
++void CameraParameters::set(const char *key, int value)
++{
++    char str[16];
++    sprintf(str, "%d", value);
++    set(key, str);
++}
++
++void CameraParameters::setFloat(const char *key, float value)
++{
++    char str[16];  // 14 should be enough. We overestimate to be safe.
++    snprintf(str, sizeof(str), "%g", value);
++    set(key, str);
++}
++
++const char *CameraParameters::get(const char *key) const
++{
++    String8 v = mMap.valueFor(String8(key));
++    if (v.length() == 0)
++        return 0;
++    return v.c_str();
++}
++
++int CameraParameters::getInt(const char *key) const
++{
++    const char *v = get(key);
++    if (v == 0)
++        return -1;
++    return strtol(v, 0, 0);
++}
++
++float CameraParameters::getFloat(const char *key) const
++{
++    const char *v = get(key);
++    if (v == 0) return -1;
++    return strtof(v, 0);
++}
++
++void CameraParameters::remove(const char *key)
++{
++    mMap.removeItem(String8(key));
++}
++
++// Parse string like "640x480" or "10000,20000"
++static int parse_pair(const char *str, int *first, int *second, char delim,
++                      char **endptr = NULL)
++{
++    // Find the first integer.
++    char *end;
++    int w = (int)strtol(str, &end, 10);
++    // If a delimiter does not immediately follow, give up.
++    if (*end != delim) {
++        ALOGE("Cannot find delimiter (%c) in str=%s", delim, str);
++        return -1;
++    }
++
++    // Find the second integer, immediately after the delimiter.
++    int h = (int)strtol(end+1, &end, 10);
++
++    *first = w;
++    *second = h;
++
++    if (endptr) {
++        *endptr = end;
++    }
++
++    return 0;
++}
++
++static void parseSizesList(const char *sizesStr, Vector<Size> &sizes)
++{
++    if (sizesStr == 0) {
++        return;
++    }
++
++    char *sizeStartPtr = (char *)sizesStr;
++
++    while (true) {
++        int width, height;
++        int success = parse_pair(sizeStartPtr, &width, &height, 'x',
++                                 &sizeStartPtr);
++        if (success == -1 || (*sizeStartPtr != ',' && *sizeStartPtr != '\0')) {
++            ALOGE("Picture sizes string \"%s\" contains invalid character.", sizesStr);
++            return;
++        }
++        sizes.push(Size(width, height));
++
++        if (*sizeStartPtr == '\0') {
++            return;
++        }
++        sizeStartPtr++;
++    }
++}
++
++void CameraParameters::setPreviewSize(int width, int height)
++{
++    char str[32];
++    sprintf(str, "%dx%d", width, height);
++    set(KEY_PREVIEW_SIZE, str);
++}
++
++void CameraParameters::getPreviewSize(int *width, int *height) const
++{
++    *width = *height = -1;
++    // Get the current string, if it doesn't exist, leave the -1x-1
++    const char *p = get(KEY_PREVIEW_SIZE);
++    if (p == 0)  return;
++    parse_pair(p, width, height, 'x');
++}
++
++void CameraParameters::getPreferredPreviewSizeForVideo(int *width, int *height) const
++{
++    *width = *height = -1;
++    const char *p = get(KEY_PREFERRED_PREVIEW_SIZE_FOR_VIDEO);
++    if (p == 0)  return;
++    parse_pair(p, width, height, 'x');
++}
++
++void CameraParameters::getSupportedPreviewSizes(Vector<Size> &sizes) const
++{
++    const char *previewSizesStr = get(KEY_SUPPORTED_PREVIEW_SIZES);
++    parseSizesList(previewSizesStr, sizes);
++}
++
++void CameraParameters::setVideoSize(int width, int height)
++{
++    char str[32];
++    sprintf(str, "%dx%d", width, height);
++    set(KEY_VIDEO_SIZE, str);
++}
++
++void CameraParameters::getVideoSize(int *width, int *height) const
++{
++    *width = *height = -1;
++    const char *p = get(KEY_VIDEO_SIZE);
++    if (p == 0) return;
++    parse_pair(p, width, height, 'x');
++}
++
++void CameraParameters::getSupportedVideoSizes(Vector<Size> &sizes) const
++{
++    const char *videoSizesStr = get(KEY_SUPPORTED_VIDEO_SIZES);
++    parseSizesList(videoSizesStr, sizes);
++}
++
++void CameraParameters::setPreviewFrameRate(int fps)
++{
++    set(KEY_PREVIEW_FRAME_RATE, fps);
++}
++
++int CameraParameters::getPreviewFrameRate() const
++{
++    return getInt(KEY_PREVIEW_FRAME_RATE);
++}
++
++void CameraParameters::getPreviewFpsRange(int *min_fps, int *max_fps) const
++{
++    *min_fps = *max_fps = -1;
++    const char *p = get(KEY_PREVIEW_FPS_RANGE);
++    if (p == 0) return;
++    parse_pair(p, min_fps, max_fps, ',');
++}
++
++void CameraParameters::setPreviewFormat(const char *format)
++{
++    set(KEY_PREVIEW_FORMAT, format);
++}
++
++const char *CameraParameters::getPreviewFormat() const
++{
++    return get(KEY_PREVIEW_FORMAT);
++}
++
++void CameraParameters::setPictureSize(int width, int height)
++{
++    char str[32];
++    sprintf(str, "%dx%d", width, height);
++    set(KEY_PICTURE_SIZE, str);
++}
++
++void CameraParameters::getPictureSize(int *width, int *height) const
++{
++    *width = *height = -1;
++    // Get the current string, if it doesn't exist, leave the -1x-1
++    const char *p = get(KEY_PICTURE_SIZE);
++    if (p == 0) return;
++    parse_pair(p, width, height, 'x');
++}
++
++void CameraParameters::getSupportedPictureSizes(Vector<Size> &sizes) const
++{
++    const char *pictureSizesStr = get(KEY_SUPPORTED_PICTURE_SIZES);
++    parseSizesList(pictureSizesStr, sizes);
++}
++
++void CameraParameters::setPictureFormat(const char *format)
++{
++    set(KEY_PICTURE_FORMAT, format);
++}
++
++const char *CameraParameters::getPictureFormat() const
++{
++    return get(KEY_PICTURE_FORMAT);
++}
++
++void CameraParameters::dump() const
++{
++    ALOGD("dump: mMap.size = %zu", mMap.size());
++    for (size_t i = 0; i < mMap.size(); i++) {
++        String8 k, v;
++        k = mMap.keyAt(i);
++        v = mMap.valueAt(i);
++        ALOGD("%s: %s\n", k.c_str(), v.c_str());
++    }
++}
++
++status_t CameraParameters::dump(int fd, const Vector<String16>& /*args*/) const
++{
++    const size_t SIZE = 256;
++    char buffer[SIZE];
++    String8 result;
++    snprintf(buffer, 255, "CameraParameters::dump: mMap.size = %zu\n", mMap.size());
++    result.append(buffer);
++    for (size_t i = 0; i < mMap.size(); i++) {
++        String8 k, v;
++        k = mMap.keyAt(i);
++        v = mMap.valueAt(i);
++        snprintf(buffer, 255, "\t%s: %s\n", k.c_str(), v.c_str());
++        result.append(buffer);
++    }
++    write(fd, result.c_str(), result.size());
++    return NO_ERROR;
++}
++
++void CameraParameters::getSupportedPreviewFormats(Vector<int>& formats) const {
++    const char* supportedPreviewFormats =
++          get(CameraParameters::KEY_SUPPORTED_PREVIEW_FORMATS);
++
++    if (supportedPreviewFormats == NULL) {
++        ALOGW("%s: No supported preview formats.", __FUNCTION__);
++        return;
++    }
++
++    String8 fmtStr(supportedPreviewFormats);
++    char* prevFmts = fmtStr.lockBuffer(fmtStr.size());
++
++    char* savePtr;
++    char* fmt = strtok_r(prevFmts, ",", &savePtr);
++    while (fmt) {
++        int actual = previewFormatToEnum(fmt);
++        if (actual != -1) {
++            formats.add(actual);
++        }
++        fmt = strtok_r(NULL, ",", &savePtr);
++    }
++    fmtStr.unlockBuffer(fmtStr.size());
++}
++
++
++int CameraParameters::previewFormatToEnum(const char* format) {
++    return
++        !format ?
++            HAL_PIXEL_FORMAT_YCrCb_420_SP :
++        !strcmp(format, PIXEL_FORMAT_YUV422SP) ?
++            HAL_PIXEL_FORMAT_YCbCr_422_SP : // NV16
++        !strcmp(format, PIXEL_FORMAT_YUV420SP) ?
++            HAL_PIXEL_FORMAT_YCrCb_420_SP : // NV21
++        !strcmp(format, PIXEL_FORMAT_YUV422I) ?
++            HAL_PIXEL_FORMAT_YCbCr_422_I :  // YUY2
++        !strcmp(format, PIXEL_FORMAT_YUV420P) ?
++            HAL_PIXEL_FORMAT_YV12 :         // YV12
++        !strcmp(format, PIXEL_FORMAT_RGB565) ?
++            HAL_PIXEL_FORMAT_RGB_565 :      // RGB565
++        !strcmp(format, PIXEL_FORMAT_RGBA8888) ?
++            HAL_PIXEL_FORMAT_RGBA_8888 :    // RGB8888
++        !strcmp(format, PIXEL_FORMAT_BAYER_RGGB) ?
++            HAL_PIXEL_FORMAT_RAW16 :   // Raw sensor data
++        -1;
++}
++
++bool CameraParameters::isEmpty() const {
++    return mMap.isEmpty();
++}
++
++}; // namespace android
+diff --git a/camera/camera/Camera.h b/camera/camera/Camera.h
+new file mode 100644
+index 0000000..f003445
+--- /dev/null
++++ b/camera/camera/Camera.h
+@@ -0,0 +1,225 @@
++/*
++ * Copyright (C) 2008 The Android Open Source Project
++ *
++ * Licensed under the Apache License, Version 2.0 (the "License");
++ * you may not use this file except in compliance with the License.
++ * You may obtain a copy of the License at
++ *
++ *      http://www.apache.org/licenses/LICENSE-2.0
++ *
++ * Unless required by applicable law or agreed to in writing, software
++ * distributed under the License is distributed on an "AS IS" BASIS,
++ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++ * See the License for the specific language governing permissions and
++ * limitations under the License.
++ */
++
++#ifndef ANDROID_HARDWARE_CAMERA_H
++#define ANDROID_HARDWARE_CAMERA_H
++
++#include <utils/Timers.h>
++
++#include <android/hardware/ICameraService.h>
++
++#include <camera/CameraBase.h>
++#include <camera/CameraUtils.h>
++#include <camera/ICameraRecordingProxy.h>
++#include <camera/ICameraRecordingProxyListener.h>
++#include <camera/android/hardware/ICamera.h>
++#include <camera/android/hardware/ICameraClient.h>
++#include <gui/Flags.h>
++#if WB_LIBCAMERASERVICE_WITH_DEPENDENCIES
++#include <gui/Surface.h>
++#else
++#include <gui/IGraphicBufferProducer.h>
++#endif
++#include <system/camera.h>
++
++namespace android {
++
++class Surface;
++class String8;
++class String16;
++
++// ref-counted object for callbacks
++class CameraListener: virtual public RefBase
++{
++public:
++    virtual void notify(int32_t msgType, int32_t ext1, int32_t ext2) = 0;
++    virtual void postData(int32_t msgType, const sp<IMemory>& dataPtr,
++                          camera_frame_metadata_t *metadata) = 0;
++    virtual void postDataTimestamp(nsecs_t timestamp, int32_t msgType, const sp<IMemory>& dataPtr) = 0;
++    virtual void postRecordingFrameHandleTimestamp(nsecs_t timestamp, native_handle_t* handle) = 0;
++    virtual void postRecordingFrameHandleTimestampBatch(
++            const std::vector<nsecs_t>& timestamps,
++            const std::vector<native_handle_t*>& handles) = 0;
++};
++
++class Camera;
++
++template <>
++struct CameraTraits<Camera>
++{
++    typedef CameraListener                     TCamListener;
++    typedef ::android::hardware::ICamera       TCamUser;
++    typedef ::android::hardware::ICameraClient TCamCallbacks;
++    typedef ::android::binder::Status (::android::hardware::ICameraService::*TCamConnectService)
++        (const sp<::android::hardware::ICameraClient>&,
++        int, int, const ::android::content::res::CameraCompatibilityInfo&, bool,
++        const AttributionSourceState&, int32_t,
++        /*out*/
++        sp<::android::hardware::ICamera>*);
++    static TCamConnectService     fnConnectService;
++};
++
++
++class Camera :
++    public CameraBase<Camera>,
++    public ::android::hardware::BnCameraClient
++{
++public:
++    enum {
++        USE_CALLING_UID = ::android::hardware::ICameraService::USE_CALLING_UID
++    };
++    enum {
++        USE_CALLING_PID = ::android::hardware::ICameraService::USE_CALLING_PID
++    };
++
++            // construct a camera client from an existing remote
++    static  sp<Camera>  create(const sp<::android::hardware::ICamera>& camera);
++    static  sp<Camera>  connect(int cameraId, int targetSdkVersion,
++                                const content::res::CameraCompatibilityInfo& compatInfo,
++                                bool forceSlowJpegMode,
++                                const AttributionSourceState& clientAttribution,
++                                int32_t devicePolicy = 0);
++
++    static  status_t  connectLegacy(int cameraId, int halVersion,
++                                     const std::string& clientPackageName,
++                                     int clientUid, int clientPid, sp<Camera>& camera);
++
++    static  status_t  connectLegacy(int cameraId, int halVersion,
++                                     const String16& clientPackageName,
++                                     int clientUid, int clientPid, sp<Camera>& camera);
++
++            virtual     ~Camera();
++
++            status_t    reconnect();
++            status_t    lock();
++            status_t    unlock();
++
++            // pass the SurfaceType to the camera service
++            status_t    setPreviewTarget(const sp<SurfaceType>& target);
++
++            // start preview mode, must call setPreviewTarget first
++            status_t    startPreview();
++
++            // stop preview mode
++            void        stopPreview();
++
++            // get preview state
++            bool        previewEnabled();
++
++            // start recording mode, must call setPreviewTarget first
++            status_t    startRecording();
++
++            // stop recording mode
++            void        stopRecording();
++
++            // get recording state
++            bool        recordingEnabled();
++
++            // release a recording frame
++            void        releaseRecordingFrame(const sp<IMemory>& mem);
++
++            // release a recording frame handle
++            void        releaseRecordingFrameHandle(native_handle_t *handle);
++
++            // release a batch of recording frame handles
++            void        releaseRecordingFrameHandleBatch(
++                    const std::vector<native_handle_t*> handles);
++
++            // autoFocus - status returned from callback
++            status_t    autoFocus();
++
++            // cancel auto focus
++            status_t    cancelAutoFocus();
++
++            // take a picture - picture returned from callback
++            status_t    takePicture(int msgType);
++
++            // set preview/capture parameters - key/value pairs
++            status_t    setParameters(const String8& params);
++
++            // get preview/capture parameters - key/value pairs
++            String8     getParameters() const;
++
++            // send command to camera driver
++            status_t    sendCommand(int32_t cmd, int32_t arg1, int32_t arg2);
++
++            // Tell camera how to pass video buffers. videoBufferMode is one of VIDEO_BUFFER_MODE_*.
++            // Returns OK if the specified video buffer mode is supported. If videoBufferMode is
++            // VIDEO_BUFFER_MODE_BUFFER_QUEUE, setVideoTarget() must be called before starting
++            // video recording.
++            status_t    setVideoBufferMode(int32_t videoBufferMode);
++
++            // Set the video buffer producer for camera to use in VIDEO_BUFFER_MODE_BUFFER_QUEUE
++            // mode.
++            status_t    setVideoTarget(const sp<SurfaceType>& target);
++
++            void        setListener(const sp<CameraListener>& listener);
++            void        setRecordingProxyListener(const sp<ICameraRecordingProxyListener>& listener);
++
++            // Configure preview callbacks to app. Only one of the older
++            // callbacks or the callback surface can be active at the same time;
++            // enabling one will disable the other if active. Flags can be
++            // disabled by calling it with CAMERA_FRAME_CALLBACK_FLAG_NOOP, and
++            // Target by calling it with a NULL interface.
++            void        setPreviewCallbackFlags(int preview_callback_flag);
++            status_t    setPreviewCallbackTarget(const sp<SurfaceType>& target);
++
++            sp<ICameraRecordingProxy> getRecordingProxy();
++
++            status_t     setAudioRestriction(int32_t mode);
++            int32_t      getGlobalAudioRestriction();
++
++    // ICameraClient interface
++    virtual void        notifyCallback(int32_t msgType, int32_t ext, int32_t ext2);
++    virtual void        dataCallback(int32_t msgType, const sp<IMemory>& dataPtr,
++                                     camera_frame_metadata_t *metadata);
++    virtual void        dataCallbackTimestamp(nsecs_t timestamp, int32_t msgType, const sp<IMemory>& dataPtr);
++    virtual void        recordingFrameHandleCallbackTimestamp(nsecs_t timestamp, native_handle_t* handle);
++    virtual void        recordingFrameHandleCallbackTimestampBatch(
++                                const std::vector<nsecs_t>& timestamps,
++                                const std::vector<native_handle_t*>& handles);
++
++
++    class RecordingProxy : public BnCameraRecordingProxy
++    {
++    public:
++        explicit RecordingProxy(const sp<Camera>& camera);
++
++        // ICameraRecordingProxy interface
++        virtual status_t startRecording(const sp<ICameraRecordingProxyListener>& listener);
++        virtual void stopRecording();
++        virtual void releaseRecordingFrame(const sp<IMemory>& mem);
++        virtual void releaseRecordingFrameHandle(native_handle_t* handle);
++        virtual void releaseRecordingFrameHandleBatch(
++                const std::vector<native_handle_t*>& handles);
++
++    private:
++        sp<Camera>         mCamera;
++    };
++
++protected:
++    explicit            Camera(int cameraId);
++                        Camera(const Camera&);
++                        Camera& operator=(const Camera);
++
++    sp<ICameraRecordingProxyListener>  mRecordingProxyListener;
++
++    friend class        CameraBase;
++};
++
++} // namespace android
++
++#endif
+diff --git a/camera/camera/CameraBase.h b/camera/camera/CameraBase.h
+new file mode 100644
+index 0000000..4b9402e
+--- /dev/null
++++ b/camera/camera/CameraBase.h
+@@ -0,0 +1,184 @@
++/*
++ * Copyright (C) 2013 The Android Open Source Project
++ *
++ * Licensed under the Apache License, Version 2.0 (the "License");
++ * you may not use this file except in compliance with the License.
++ * You may obtain a copy of the License at
++ *
++ *      http://www.apache.org/licenses/LICENSE-2.0
++ *
++ * Unless required by applicable law or agreed to in writing, software
++ * distributed under the License is distributed on an "AS IS" BASIS,
++ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++ * See the License for the specific language governing permissions and
++ * limitations under the License.
++ */
++
++#ifndef ANDROID_HARDWARE_CAMERA_BASE_H
++#define ANDROID_HARDWARE_CAMERA_BASE_H
++
++#include <android/content/AttributionSourceState.h>
++#include <android/content/res/CameraCompatibilityInfo.h>
++#include <android/hardware/ICameraServiceListener.h>
++
++#include <utils/Mutex.h>
++#include <binder/BinderService.h>
++
++struct camera_frame_metadata;
++
++namespace android {
++
++namespace hardware {
++
++
++class ICameraService;
++class ICameraServiceListener;
++
++enum {
++    /** The facing of the camera is opposite to that of the screen. */
++    CAMERA_FACING_BACK = 0,
++    /** The facing of the camera is the same as that of the screen. */
++    CAMERA_FACING_FRONT = 1,
++};
++
++struct CameraInfo : public android::Parcelable {
++    /**
++     * The direction that the camera faces to. It should be CAMERA_FACING_BACK
++     * or CAMERA_FACING_FRONT.
++     */
++    int facing;
++
++    /**
++     * The orientation of the camera image. The value is the angle that the
++     * camera image needs to be rotated clockwise so it shows correctly on the
++     * display in its natural orientation. It should be 0, 90, 180, or 270.
++     *
++     * For example, suppose a device has a naturally tall screen. The
++     * back-facing camera sensor is mounted in landscape. You are looking at
++     * the screen. If the top side of the camera sensor is aligned with the
++     * right edge of the screen in natural orientation, the value should be
++     * 90. If the top side of a front-facing camera sensor is aligned with the
++     * right of the screen, the value should be 270.
++     */
++    int orientation;
++
++    virtual status_t writeToParcel(android::Parcel* parcel) const;
++    virtual status_t readFromParcel(const android::Parcel* parcel);
++};
++
++/**
++ * Basic status information about a camera device - its id and its current
++ * state.
++ */
++struct CameraStatus : public android::Parcelable {
++    /**
++     * The app-visible id of the camera device
++     */
++    std::string cameraId;
++
++    /**
++     * Its current status, one of the ICameraService::STATUS_* fields
++     */
++    int32_t status;
++
++    /**
++     * Unavailable physical camera names for a multi-camera device
++     */
++    std::vector<std::string> unavailablePhysicalIds;
++
++    /**
++     * Client package name if camera is open, otherwise not applicable
++     */
++    std::string clientPackage;
++
++    /**
++     * The id of the device owning the camera. For virtual cameras, this is the id of the virtual
++     * device owning the camera. For real cameras, this is the default device id, i.e.,
++     * kDefaultDeviceId.
++     */
++    int32_t deviceId;
++
++    virtual status_t writeToParcel(android::Parcel* parcel) const;
++    virtual status_t readFromParcel(const android::Parcel* parcel);
++
++    CameraStatus(std::string id, int32_t s, const std::vector<std::string>& unavailSubIds,
++            const std::string& clientPkg, int32_t devId) : cameraId(id), status(s),
++            unavailablePhysicalIds(unavailSubIds), clientPackage(clientPkg), deviceId(devId) {}
++    CameraStatus() : status(ICameraServiceListener::STATUS_PRESENT) {}
++};
++
++} // namespace hardware
++
++using content::AttributionSourceState;
++using content::res::CameraCompatibilityInfo;
++using hardware::CameraInfo;
++
++template <typename TCam>
++struct CameraTraits {
++};
++
++template <typename TCam, typename TCamTraits = CameraTraits<TCam> >
++class CameraBase : public IBinder::DeathRecipient
++{
++public:
++    typedef typename TCamTraits::TCamListener       TCamListener;
++    typedef typename TCamTraits::TCamUser           TCamUser;
++    typedef typename TCamTraits::TCamCallbacks      TCamCallbacks;
++    typedef typename TCamTraits::TCamConnectService TCamConnectService;
++
++    static sp<TCam>      connect(int cameraId, int targetSdkVersion,
++                                 const CameraCompatibilityInfo& compatInfo, bool forceSlowJpegMode,
++                                 const AttributionSourceState &clientAttribution,
++                                 int32_t devicePolicy);
++    virtual void         disconnect();
++
++    void                 setListener(const sp<TCamListener>& listener);
++
++    static int           getNumberOfCameras(const AttributionSourceState& clientAttribution,
++                                            int32_t devicePolicy);
++
++    static status_t      getCameraInfo(int cameraId,
++                                       const CameraCompatibilityInfo& compatInfo,
++                                       const AttributionSourceState& clientAttribution,
++                                       int32_t devicePolicy,
++                                       /*out*/
++                                       struct hardware::CameraInfo* cameraInfo);
++
++    sp<TCamUser>         remote();
++
++    // Status is set to 'UNKNOWN_ERROR' after successful (re)connection
++    status_t             getStatus();
++
++protected:
++    CameraBase(int cameraId);
++    virtual              ~CameraBase();
++
++    ////////////////////////////////////////////////////////
++    // TCamCallbacks implementation
++    ////////////////////////////////////////////////////////
++    virtual void         notifyCallback(int32_t msgType, int32_t ext,
++                                        int32_t ext2);
++
++    ////////////////////////////////////////////////////////
++    // Common instance variables
++    ////////////////////////////////////////////////////////
++    Mutex                            mLock;
++
++    virtual void                     binderDied(const wp<IBinder>& who);
++
++    // helper function to obtain camera service handle
++    static const sp<::android::hardware::ICameraService> getCameraService();
++
++    sp<TCamUser>                     mCamera;
++    status_t                         mStatus;
++
++    sp<TCamListener>                 mListener;
++
++    const int                        mCameraId;
++
++    typedef CameraBase<TCam>         CameraBaseT;
++};
++
++} // namespace android
++
++#endif
+diff --git a/camera/camera/CameraMetadata.h b/camera/camera/CameraMetadata.h
+new file mode 100644
+index 0000000..10ecc4f
+--- /dev/null
++++ b/camera/camera/CameraMetadata.h
+@@ -0,0 +1,313 @@
++/*
++ * Copyright (C) 2012 The Android Open Source Project
++ *
++ * Licensed under the Apache License, Version 2.0 (the "License");
++ * you may not use this file except in compliance with the License.
++ * You may obtain a copy of the License at
++ *
++ *      http://www.apache.org/licenses/LICENSE-2.0
++ *
++ * Unless required by applicable law or agreed to in writing, software
++ * distributed under the License is distributed on an "AS IS" BASIS,
++ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++ * See the License for the specific language governing permissions and
++ * limitations under the License.
++ */
++
++#ifndef ANDROID_CLIENT_CAMERA2_CAMERAMETADATA_CPP
++#define ANDROID_CLIENT_CAMERA2_CAMERAMETADATA_CPP
++
++#include "system/camera_metadata.h"
++
++#include <utils/String8.h>
++#include <utils/Vector.h>
++#include <binder/Parcelable.h>
++#include <camera/VendorTagDescriptor.h>
++
++namespace android {
++
++class VendorTagDescriptor;
++
++/**
++ * A convenience wrapper around the C-based camera_metadata_t library.
++ */
++class CameraMetadata: public Parcelable {
++  public:
++    /** Creates an empty object; best used when expecting to acquire contents
++     * from elsewhere */
++    CameraMetadata();
++    /** Creates an object with space for entryCapacity entries, with
++     * dataCapacity extra storage */
++    CameraMetadata(size_t entryCapacity, size_t dataCapacity = 10);
++
++    /**
++     * Move constructor, acquires other's metadata buffer
++     */
++    CameraMetadata(CameraMetadata &&other);
++
++    ~CameraMetadata();
++
++    /** Takes ownership of passed-in buffer */
++    CameraMetadata(camera_metadata_t *buffer);
++    /** Clones the metadata */
++    CameraMetadata(const CameraMetadata &other);
++
++    /**
++     * Assignment clones metadata buffer.
++     */
++    CameraMetadata &operator=(const CameraMetadata &other);
++    CameraMetadata &operator=(const camera_metadata_t *buffer);
++
++    /**
++     * Move assignment operator, acquires other's metadata buffer
++     */
++    CameraMetadata &operator=(CameraMetadata &&other);
++
++    /**
++     * Get reference to the underlying metadata buffer. Ownership remains with
++     * the CameraMetadata object, but non-const CameraMetadata methods will not
++     * work until unlock() is called. Note that the lock has nothing to do with
++     * thread-safety, it simply prevents the camera_metadata_t pointer returned
++     * here from being accidentally invalidated by CameraMetadata operations.
++     */
++    const camera_metadata_t* getAndLock() const;
++
++    /**
++     * Unlock the CameraMetadata for use again. After this unlock, the pointer
++     * given from getAndLock() may no longer be used. The pointer passed out
++     * from getAndLock must be provided to guarantee that the right object is
++     * being unlocked.
++     */
++    status_t unlock(const camera_metadata_t *buffer) const;
++
++    /**
++     * Release a raw metadata buffer to the caller. After this call,
++     * CameraMetadata no longer references the buffer, and the caller takes
++     * responsibility for freeing the raw metadata buffer (using
++     * free_camera_metadata()), or for handing it to another CameraMetadata
++     * instance.
++     */
++    camera_metadata_t* release();
++
++    /**
++     * Clear the metadata buffer and free all storage used by it
++     */
++    void clear();
++
++    /**
++     * Acquire a raw metadata buffer from the caller. After this call,
++     * the caller no longer owns the raw buffer, and must not free or manipulate it.
++     * If CameraMetadata already contains metadata, it is freed.
++     */
++    void acquire(camera_metadata_t* buffer);
++
++    /**
++     * Acquires raw buffer from other CameraMetadata object. After the call, the argument
++     * object no longer has any metadata.
++     */
++    void acquire(CameraMetadata &other);
++
++    /**
++     * Append metadata from another CameraMetadata object.
++     */
++    status_t append(const CameraMetadata &other);
++
++    /**
++     * Append metadata from a raw camera_metadata buffer
++     */
++    status_t append(const camera_metadata* other);
++
++    /**
++     * Number of metadata entries.
++     */
++    size_t entryCount() const;
++
++    /**
++     * Is the buffer empty (no entires)
++     */
++    bool isEmpty() const;
++
++    /**
++     * Return the allocated camera metadata buffer size in bytes.
++     */
++    size_t bufferSize() const;
++
++    /**
++     * Sort metadata buffer for faster find
++     */
++    status_t sort();
++
++    /**
++     * Update metadata entry. Will create entry if it doesn't exist already, and
++     * will reallocate the buffer if insufficient space exists. Overloaded for
++     * the various types of valid data.
++     */
++    status_t update(uint32_t tag,
++            const uint8_t *data, size_t data_count);
++    status_t update(uint32_t tag,
++            const int32_t *data, size_t data_count);
++    status_t update(uint32_t tag,
++            const float *data, size_t data_count);
++    status_t update(uint32_t tag,
++            const int64_t *data, size_t data_count);
++    status_t update(uint32_t tag,
++            const double *data, size_t data_count);
++    status_t update(uint32_t tag,
++            const camera_metadata_rational_t *data, size_t data_count);
++    status_t update(uint32_t tag,
++            const String8 &string);
++    status_t update(const camera_metadata_ro_entry &entry);
++
++
++    template<typename T>
++    status_t update(uint32_t tag, Vector<T> data) {
++        return update(tag, data.array(), data.size());
++    }
++
++    /**
++     * Check if a metadata entry exists for a given tag id
++     *
++     */
++    bool exists(uint32_t tag) const;
++
++    /**
++     * Get metadata entry by tag id
++     */
++    camera_metadata_entry find(uint32_t tag);
++
++    /**
++     * Get metadata entry by tag id, with no editing
++     */
++    camera_metadata_ro_entry find(uint32_t tag) const;
++
++    /**
++     * Delete metadata entry by tag
++     */
++    status_t erase(uint32_t tag);
++
++    /**
++     * Remove metadata entries that need additional permissions.
++     */
++    status_t removePermissionEntries(metadata_vendor_id_t vendorId,
++            std::vector<int32_t> *tagsRemoved /*out*/);
++
++    /**
++     * Swap the underlying camera metadata between this and the other
++     * metadata object.
++     */
++    void swap(CameraMetadata &other);
++
++    /**
++     * Dump contents into FD for debugging. The verbosity levels are
++     * 0: Tag entry information only, no data values
++     * 1: Level 0 plus at most 16 data values per entry
++     * 2: All information
++     *
++     * The indentation parameter sets the number of spaces to add to the start
++     * each line of output.
++     */
++    void dump(int fd, int verbosity = 1, int indentation = 0) const;
++
++    /**
++     * Serialization over Binder
++     */
++
++    // Metadata object is unchanged when reading from parcel fails.
++    virtual status_t readFromParcel(const Parcel *parcel) override;
++    virtual status_t writeToParcel(Parcel *parcel) const override;
++
++    /**
++      * Caller becomes the owner of the new metadata
++      * 'const Parcel' doesnt prevent us from calling the read functions.
++      *  which is interesting since it changes the internal state
++      *
++      * NULL can be returned when no metadata was sent, OR if there was an issue
++      * unpacking the serialized data (i.e. bad parcel or invalid structure).
++      */
++    static status_t readFromParcel(const Parcel &parcel,
++                                   camera_metadata_t** out);
++    /**
++      * Caller retains ownership of metadata
++      * - Write 2 (int32 + blob) args in the current position
++      */
++    static status_t writeToParcel(Parcel &parcel,
++                                  const camera_metadata_t* metadata);
++
++    /**
++     * Find tag id for a given tag name, also checking vendor tags if available.
++     * On success, returns OK and writes the tag id into tag.
++     *
++     * This is a slow method.
++     */
++    static status_t getTagFromName(const char *name,
++            const VendorTagDescriptor* vTags, uint32_t *tag);
++
++    /**
++     * Return the current vendor tag id associated with this metadata.
++     */
++    metadata_vendor_id_t getVendorId() const;
++
++   // Needed for auto-generated code if CameraMetadata is used in
++   // parcelables in .aidl files.
++   inline bool operator == (const CameraMetadata& rhs) const {
++        return mBuffer == rhs.mBuffer;
++    }
++
++    inline bool operator < (const CameraMetadata& rhs) const {
++        return mBuffer < rhs.mBuffer;
++    }
++
++    inline bool operator != (const CameraMetadata& rhs) const {
++        return !(*this == rhs);
++    }
++
++    inline bool operator > (const CameraMetadata& rhs) const {
++        return rhs < *this;
++    }
++
++    inline bool operator >= (const CameraMetadata& rhs) const {
++        return !(*this < rhs);
++    }
++
++    inline bool operator <= (const CameraMetadata& rhs) const {
++        return !(rhs < *this);
++    }
++
++  inline std::string toString() const {
++        std::string descStr = "CameraMetadata";
++        return descStr;
++  }
++
++
++  private:
++    camera_metadata_t *mBuffer;
++    mutable bool       mLocked;
++
++    /**
++     * Check if tag has a given type
++     */
++    status_t checkType(uint32_t tag, uint8_t expectedType);
++
++    /**
++     * Base update entry method
++     */
++    status_t updateImpl(uint32_t tag, const void *data, size_t data_count);
++
++    /**
++     * Resize metadata buffer if needed by reallocating it and copying it over.
++     */
++    status_t resizeIfNeeded(size_t extraEntries, size_t extraData);
++};
++
++namespace hardware {
++namespace camera2 {
++namespace impl {
++using ::android::CameraMetadata;
++typedef CameraMetadata CameraMetadataNative;
++}
++}
++}
++
++} // namespace android
++
++#endif
+diff --git a/camera/camera/CameraParameters.h b/camera/camera/CameraParameters.h
+new file mode 100644
+index 0000000..ba33ffe
+--- /dev/null
++++ b/camera/camera/CameraParameters.h
+@@ -0,0 +1,699 @@
++/*
++ * Copyright (C) 2008 The Android Open Source Project
++ *
++ * Licensed under the Apache License, Version 2.0 (the "License");
++ * you may not use this file except in compliance with the License.
++ * You may obtain a copy of the License at
++ *
++ *      http://www.apache.org/licenses/LICENSE-2.0
++ *
++ * Unless required by applicable law or agreed to in writing, software
++ * distributed under the License is distributed on an "AS IS" BASIS,
++ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++ * See the License for the specific language governing permissions and
++ * limitations under the License.
++ */
++
++#ifndef ANDROID_HARDWARE_CAMERA_PARAMETERS_H
++#define ANDROID_HARDWARE_CAMERA_PARAMETERS_H
++
++#include <utils/KeyedVector.h>
++#include <utils/String8.h>
++
++namespace android {
++
++struct Size {
++    int width;
++    int height;
++
++    Size() {
++        width = 0;
++        height = 0;
++    }
++
++    Size(int w, int h) {
++        width = w;
++        height = h;
++    }
++};
++
++class CameraParameters
++{
++public:
++    CameraParameters();
++    CameraParameters(const String8 &params) { unflatten(params); }
++    ~CameraParameters();
++
++    String8 flatten() const;
++    void unflatten(const String8 &params);
++
++    void set(const char *key, const char *value);
++    void set(const char *key, int value);
++    void setFloat(const char *key, float value);
++    const char *get(const char *key) const;
++    int getInt(const char *key) const;
++    float getFloat(const char *key) const;
++
++    void remove(const char *key);
++
++    void setPreviewSize(int width, int height);
++    void getPreviewSize(int *width, int *height) const;
++    void getSupportedPreviewSizes(Vector<Size> &sizes) const;
++
++    // Set the dimensions in pixels to the given width and height
++    // for video frames. The given width and height must be one
++    // of the supported dimensions returned from
++    // getSupportedVideoSizes(). Must not be called if
++    // getSupportedVideoSizes() returns an empty Vector of Size.
++    void setVideoSize(int width, int height);
++    // Retrieve the current dimensions (width and height)
++    // in pixels for video frames, which must be one of the
++    // supported dimensions returned from getSupportedVideoSizes().
++    // Must not be called if getSupportedVideoSizes() returns an
++    // empty Vector of Size.
++    void getVideoSize(int *width, int *height) const;
++    // Retrieve a Vector of supported dimensions (width and height)
++    // in pixels for video frames. If sizes returned from the method
++    // is empty, the camera does not support calls to setVideoSize()
++    // or getVideoSize(). In adddition, it also indicates that
++    // the camera only has a single output, and does not have
++    // separate output for video frames and preview frame.
++    void getSupportedVideoSizes(Vector<Size> &sizes) const;
++    // Retrieve the preferred preview size (width and height) in pixels
++    // for video recording. The given width and height must be one of
++    // supported preview sizes returned from getSupportedPreviewSizes().
++    // Must not be called if getSupportedVideoSizes() returns an empty
++    // Vector of Size. If getSupportedVideoSizes() returns an empty
++    // Vector of Size, the width and height returned from this method
++    // is invalid, and is "-1x-1".
++    void getPreferredPreviewSizeForVideo(int *width, int *height) const;
++
++    void setPreviewFrameRate(int fps);
++    int getPreviewFrameRate() const;
++    void getPreviewFpsRange(int *min_fps, int *max_fps) const;
++    void setPreviewFormat(const char *format);
++    const char *getPreviewFormat() const;
++    void setPictureSize(int width, int height);
++    void getPictureSize(int *width, int *height) const;
++    void getSupportedPictureSizes(Vector<Size> &sizes) const;
++    void setPictureFormat(const char *format);
++    const char *getPictureFormat() const;
++
++    void dump() const;
++    status_t dump(int fd, const Vector<String16>& args) const;
++
++    /**
++     * Returns a Vector containing the supported preview formats
++     * as enums given in graphics.h.
++     */
++    void getSupportedPreviewFormats(Vector<int>& formats) const;
++
++    // Returns true if no keys are present
++    bool isEmpty() const;
++
++    // Parameter keys to communicate between camera application and driver.
++    // The access (read/write, read only, or write only) is viewed from the
++    // perspective of applications, not driver.
++
++    // Preview frame size in pixels (width x height).
++    // Example value: "480x320". Read/Write.
++    static const char KEY_PREVIEW_SIZE[];
++    // Supported preview frame sizes in pixels.
++    // Example value: "800x600,480x320". Read only.
++    static const char KEY_SUPPORTED_PREVIEW_SIZES[];
++    // The current minimum and maximum preview fps. This controls the rate of
++    // preview frames received (CAMERA_MSG_PREVIEW_FRAME). The minimum and
++    // maximum fps must be one of the elements from
++    // KEY_SUPPORTED_PREVIEW_FPS_RANGE parameter.
++    // Example value: "10500,26623"
++    static const char KEY_PREVIEW_FPS_RANGE[];
++    // The supported preview fps (frame-per-second) ranges. Each range contains
++    // a minimum fps and maximum fps. If minimum fps equals to maximum fps, the
++    // camera outputs frames in fixed frame rate. If not, the camera outputs
++    // frames in auto frame rate. The actual frame rate fluctuates between the
++    // minimum and the maximum. The list has at least one element. The list is
++    // sorted from small to large (first by maximum fps and then minimum fps).
++    // Example value: "(10500,26623),(15000,26623),(30000,30000)"
++    static const char KEY_SUPPORTED_PREVIEW_FPS_RANGE[];
++    // The image format for preview frames. See CAMERA_MSG_PREVIEW_FRAME in
++    // frameworks/av/include/camera/Camera.h. The default is
++    // PIXEL_FORMAT_YUV420SP. Example value: "yuv420sp" or PIXEL_FORMAT_XXX
++    // constants. Read/write.
++    static const char KEY_PREVIEW_FORMAT[];
++    // Supported image formats for preview frames.
++    // Example value: "yuv420sp,yuv422i-yuyv". Read only.
++    static const char KEY_SUPPORTED_PREVIEW_FORMATS[];
++    // Number of preview frames per second. This is the target frame rate. The
++    // actual frame rate depends on the driver.
++    // Example value: "15". Read/write.
++    static const char KEY_PREVIEW_FRAME_RATE[];
++    // Supported number of preview frames per second.
++    // Example value: "24,15,10". Read.
++    static const char KEY_SUPPORTED_PREVIEW_FRAME_RATES[];
++    // The dimensions for captured pictures in pixels (width x height).
++    // Example value: "1024x768". Read/write.
++    static const char KEY_PICTURE_SIZE[];
++    // Supported dimensions for captured pictures in pixels.
++    // Example value: "2048x1536,1024x768". Read only.
++    static const char KEY_SUPPORTED_PICTURE_SIZES[];
++    // The image format for captured pictures. See CAMERA_MSG_COMPRESSED_IMAGE
++    // in frameworks/base/include/camera/Camera.h.
++    // Example value: "jpeg" or PIXEL_FORMAT_XXX constants. Read/write.
++    static const char KEY_PICTURE_FORMAT[];
++    // Supported image formats for captured pictures.
++    // Example value: "jpeg,rgb565". Read only.
++    static const char KEY_SUPPORTED_PICTURE_FORMATS[];
++    // The width (in pixels) of EXIF thumbnail in Jpeg picture.
++    // Example value: "512". Read/write.
++    static const char KEY_JPEG_THUMBNAIL_WIDTH[];
++    // The height (in pixels) of EXIF thumbnail in Jpeg picture.
++    // Example value: "384". Read/write.
++    static const char KEY_JPEG_THUMBNAIL_HEIGHT[];
++    // Supported EXIF thumbnail sizes (width x height). 0x0 means not thumbnail
++    // in EXIF.
++    // Example value: "512x384,320x240,0x0". Read only.
++    static const char KEY_SUPPORTED_JPEG_THUMBNAIL_SIZES[];
++    // The quality of the EXIF thumbnail in Jpeg picture. The range is 1 to 100,
++    // with 100 being the best.
++    // Example value: "90". Read/write.
++    static const char KEY_JPEG_THUMBNAIL_QUALITY[];
++    // Jpeg quality of captured picture. The range is 1 to 100, with 100 being
++    // the best.
++    // Example value: "90". Read/write.
++    static const char KEY_JPEG_QUALITY[];
++    // The rotation angle in degrees relative to the orientation of the camera.
++    // This affects the pictures returned from CAMERA_MSG_COMPRESSED_IMAGE. The
++    // camera driver may set orientation in the EXIF header without rotating the
++    // picture. Or the driver may rotate the picture and the EXIF thumbnail. If
++    // the Jpeg picture is rotated, the orientation in the EXIF header will be
++    // missing or 1 (row #0 is top and column #0 is left side).
++    //
++    // Note that the JPEG pictures of front-facing cameras are not mirrored
++    // as in preview display.
++    //
++    // For example, suppose the natural orientation of the device is portrait.
++    // The device is rotated 270 degrees clockwise, so the device orientation is
++    // 270. Suppose a back-facing camera sensor is mounted in landscape and the
++    // top side of the camera sensor is aligned with the right edge of the
++    // display in natural orientation. So the camera orientation is 90. The
++    // rotation should be set to 0 (270 + 90).
++    //
++    // Example value: "0" or "90" or "180" or "270". Write only.
++    static const char KEY_ROTATION[];
++    // GPS latitude coordinate. GPSLatitude and GPSLatitudeRef will be stored in
++    // JPEG EXIF header.
++    // Example value: "25.032146" or "-33.462809". Write only.
++    static const char KEY_GPS_LATITUDE[];
++    // GPS longitude coordinate. GPSLongitude and GPSLongitudeRef will be stored
++    // in JPEG EXIF header.
++    // Example value: "121.564448" or "-70.660286". Write only.
++    static const char KEY_GPS_LONGITUDE[];
++    // GPS altitude. GPSAltitude and GPSAltitudeRef will be stored in JPEG EXIF
++    // header.
++    // Example value: "21.0" or "-5". Write only.
++    static const char KEY_GPS_ALTITUDE[];
++    // GPS timestamp (UTC in seconds since January 1, 1970). This should be
++    // stored in JPEG EXIF header.
++    // Example value: "1251192757". Write only.
++    static const char KEY_GPS_TIMESTAMP[];
++    // GPS Processing Method
++    // Example value: "GPS" or "NETWORK". Write only.
++    static const char KEY_GPS_PROCESSING_METHOD[];
++    // Current white balance setting.
++    // Example value: "auto" or WHITE_BALANCE_XXX constants. Read/write.
++    static const char KEY_WHITE_BALANCE[];
++    // Supported white balance settings.
++    // Example value: "auto,incandescent,daylight". Read only.
++    static const char KEY_SUPPORTED_WHITE_BALANCE[];
++    // Current color effect setting.
++    // Example value: "none" or EFFECT_XXX constants. Read/write.
++    static const char KEY_EFFECT[];
++    // Supported color effect settings.
++    // Example value: "none,mono,sepia". Read only.
++    static const char KEY_SUPPORTED_EFFECTS[];
++    // Current antibanding setting.
++    // Example value: "auto" or ANTIBANDING_XXX constants. Read/write.
++    static const char KEY_ANTIBANDING[];
++    // Supported antibanding settings.
++    // Example value: "auto,50hz,60hz,off". Read only.
++    static const char KEY_SUPPORTED_ANTIBANDING[];
++    // Current scene mode.
++    // Example value: "auto" or SCENE_MODE_XXX constants. Read/write.
++    static const char KEY_SCENE_MODE[];
++    // Supported scene mode settings.
++    // Example value: "auto,night,fireworks". Read only.
++    static const char KEY_SUPPORTED_SCENE_MODES[];
++    // Current flash mode.
++    // Example value: "auto" or FLASH_MODE_XXX constants. Read/write.
++    static const char KEY_FLASH_MODE[];
++    // Supported flash modes.
++    // Example value: "auto,on,off". Read only.
++    static const char KEY_SUPPORTED_FLASH_MODES[];
++    // Current focus mode. This will not be empty. Applications should call
++    // CameraHardwareInterface.autoFocus to start the focus if focus mode is
++    // FOCUS_MODE_AUTO or FOCUS_MODE_MACRO.
++    // Example value: "auto" or FOCUS_MODE_XXX constants. Read/write.
++    static const char KEY_FOCUS_MODE[];
++    // Supported focus modes.
++    // Example value: "auto,macro,fixed". Read only.
++    static const char KEY_SUPPORTED_FOCUS_MODES[];
++    // The maximum number of focus areas supported. This is the maximum length
++    // of KEY_FOCUS_AREAS.
++    // Example value: "0" or "2". Read only.
++    static const char KEY_MAX_NUM_FOCUS_AREAS[];
++    // Current focus areas.
++    //
++    // Before accessing this parameter, apps should check
++    // KEY_MAX_NUM_FOCUS_AREAS first to know the maximum number of focus areas
++    // first. If the value is 0, focus area is not supported.
++    //
++    // Each focus area is a five-element int array. The first four elements are
++    // the rectangle of the area (left, top, right, bottom). The direction is
++    // relative to the sensor orientation, that is, what the sensor sees. The
++    // direction is not affected by the rotation or mirroring of
++    // CAMERA_CMD_SET_DISPLAY_ORIENTATION. Coordinates range from -1000 to 1000.
++    // (-1000,-1000) is the upper left point. (1000, 1000) is the lower right
++    // point. The width and height of focus areas cannot be 0 or negative.
++    //
++    // The fifth element is the weight. Values for weight must range from 1 to
++    // 1000.  The weight should be interpreted as a per-pixel weight - all
++    // pixels in the area have the specified weight. This means a small area
++    // with the same weight as a larger area will have less influence on the
++    // focusing than the larger area. Focus areas can partially overlap and the
++    // driver will add the weights in the overlap region.
++    //
++    // A special case of single focus area (0,0,0,0,0) means driver to decide
++    // the focus area. For example, the driver may use more signals to decide
++    // focus areas and change them dynamically. Apps can set (0,0,0,0,0) if they
++    // want the driver to decide focus areas.
++    //
++    // Focus areas are relative to the current field of view (KEY_ZOOM). No
++    // matter what the zoom level is, (-1000,-1000) represents the top of the
++    // currently visible camera frame. The focus area cannot be set to be
++    // outside the current field of view, even when using zoom.
++    //
++    // Focus area only has effect if the current focus mode is FOCUS_MODE_AUTO,
++    // FOCUS_MODE_MACRO, FOCUS_MODE_CONTINUOUS_VIDEO, or
++    // FOCUS_MODE_CONTINUOUS_PICTURE.
++    // Example value: "(-10,-10,0,0,300),(0,0,10,10,700)". Read/write.
++    static const char KEY_FOCUS_AREAS[];
++    // Focal length in millimeter.
++    // Example value: "4.31". Read only.
++    static const char KEY_FOCAL_LENGTH[];
++    // Horizontal angle of view in degrees.
++    // Example value: "54.8". Read only.
++    static const char KEY_HORIZONTAL_VIEW_ANGLE[];
++    // Vertical angle of view in degrees.
++    // Example value: "42.5". Read only.
++    static const char KEY_VERTICAL_VIEW_ANGLE[];
++    // Exposure compensation index. 0 means exposure is not adjusted.
++    // Example value: "-5" or "5". Read/write.
++    static const char KEY_EXPOSURE_COMPENSATION[];
++    // The maximum exposure compensation index (>=0).
++    // Example value: "6". Read only.
++    static const char KEY_MAX_EXPOSURE_COMPENSATION[];
++    // The minimum exposure compensation index (<=0).
++    // Example value: "-6". Read only.
++    static const char KEY_MIN_EXPOSURE_COMPENSATION[];
++    // The exposure compensation step. Exposure compensation index multiply by
++    // step eqals to EV. Ex: if exposure compensation index is -6 and step is
++    // 0.3333, EV is -2.
++    // Example value: "0.333333333" or "0.5". Read only.
++    static const char KEY_EXPOSURE_COMPENSATION_STEP[];
++    // The state of the auto-exposure lock. "true" means that
++    // auto-exposure is locked to its current value and will not
++    // change. "false" means the auto-exposure routine is free to
++    // change exposure values. If auto-exposure is already locked,
++    // setting this to true again has no effect (the driver will not
++    // recalculate exposure values). Changing exposure compensation
++    // settings will still affect the exposure settings while
++    // auto-exposure is locked. Stopping preview or taking a still
++    // image will not change the lock. In conjunction with
++    // exposure compensation, this allows for capturing multi-exposure
++    // brackets with known relative exposure values. Locking
++    // auto-exposure after open but before the first call to
++    // startPreview may result in severely over- or under-exposed
++    // images.  The driver will not change the AE lock after
++    // auto-focus completes.
++    static const char KEY_AUTO_EXPOSURE_LOCK[];
++    // Whether locking the auto-exposure is supported. "true" means it is, and
++    // "false" or this key not existing means it is not supported.
++    static const char KEY_AUTO_EXPOSURE_LOCK_SUPPORTED[];
++    // The state of the auto-white balance lock. "true" means that
++    // auto-white balance is locked to its current value and will not
++    // change. "false" means the auto-white balance routine is free to
++    // change white balance values. If auto-white balance is already
++    // locked, setting this to true again has no effect (the driver
++    // will not recalculate white balance values). Stopping preview or
++    // taking a still image will not change the lock. In conjunction
++    // with exposure compensation, this allows for capturing
++    // multi-exposure brackets with fixed white balance. Locking
++    // auto-white balance after open but before the first call to
++    // startPreview may result in severely incorrect color.  The
++    // driver will not change the AWB lock after auto-focus
++    // completes.
++    static const char KEY_AUTO_WHITEBALANCE_LOCK[];
++    // Whether locking the auto-white balance is supported. "true"
++    // means it is, and "false" or this key not existing means it is
++    // not supported.
++    static const char KEY_AUTO_WHITEBALANCE_LOCK_SUPPORTED[];
++
++    // The maximum number of metering areas supported. This is the maximum
++    // length of KEY_METERING_AREAS.
++    // Example value: "0" or "2". Read only.
++    static const char KEY_MAX_NUM_METERING_AREAS[];
++    // Current metering areas. Camera driver uses these areas to decide
++    // exposure.
++    //
++    // Before accessing this parameter, apps should check
++    // KEY_MAX_NUM_METERING_AREAS first to know the maximum number of metering
++    // areas first. If the value is 0, metering area is not supported.
++    //
++    // Each metering area is a rectangle with specified weight. The direction is
++    // relative to the sensor orientation, that is, what the sensor sees. The
++    // direction is not affected by the rotation or mirroring of
++    // CAMERA_CMD_SET_DISPLAY_ORIENTATION. Coordinates of the rectangle range
++    // from -1000 to 1000. (-1000, -1000) is the upper left point. (1000, 1000)
++    // is the lower right point. The width and height of metering areas cannot
++    // be 0 or negative.
++    //
++    // The fifth element is the weight. Values for weight must range from 1 to
++    // 1000.  The weight should be interpreted as a per-pixel weight - all
++    // pixels in the area have the specified weight. This means a small area
++    // with the same weight as a larger area will have less influence on the
++    // metering than the larger area. Metering areas can partially overlap and
++    // the driver will add the weights in the overlap region.
++    //
++    // A special case of all-zero single metering area means driver to decide
++    // the metering area. For example, the driver may use more signals to decide
++    // metering areas and change them dynamically. Apps can set all-zero if they
++    // want the driver to decide metering areas.
++    //
++    // Metering areas are relative to the current field of view (KEY_ZOOM).
++    // No matter what the zoom level is, (-1000,-1000) represents the top of the
++    // currently visible camera frame. The metering area cannot be set to be
++    // outside the current field of view, even when using zoom.
++    //
++    // No matter what metering areas are, the final exposure are compensated
++    // by KEY_EXPOSURE_COMPENSATION.
++    // Example value: "(-10,-10,0,0,300),(0,0,10,10,700)". Read/write.
++    static const char KEY_METERING_AREAS[];
++    // Current zoom value.
++    // Example value: "0" or "6". Read/write.
++    static const char KEY_ZOOM[];
++    // Maximum zoom value.
++    // Example value: "6". Read only.
++    static const char KEY_MAX_ZOOM[];
++    // The zoom ratios of all zoom values. The zoom ratio is in 1/100
++    // increments. Ex: a zoom of 3.2x is returned as 320. The number of list
++    // elements is KEY_MAX_ZOOM + 1. The first element is always 100. The last
++    // element is the zoom ratio of zoom value KEY_MAX_ZOOM.
++    // Example value: "100,150,200,250,300,350,400". Read only.
++    static const char KEY_ZOOM_RATIOS[];
++    // Whether zoom is supported. Zoom is supported if the value is "true". Zoom
++    // is not supported if the value is not "true" or the key does not exist.
++    // Example value: "true". Read only.
++    static const char KEY_ZOOM_SUPPORTED[];
++    // Whether if smooth zoom is supported. Smooth zoom is supported if the
++    // value is "true". It is not supported if the value is not "true" or the
++    // key does not exist.
++    // See CAMERA_CMD_START_SMOOTH_ZOOM, CAMERA_CMD_STOP_SMOOTH_ZOOM, and
++    // CAMERA_MSG_ZOOM in frameworks/base/include/camera/Camera.h.
++    // Example value: "true". Read only.
++    static const char KEY_SMOOTH_ZOOM_SUPPORTED[];
++
++    // The distances (in meters) from the camera to where an object appears to
++    // be in focus. The object is sharpest at the optimal focus distance. The
++    // depth of field is the far focus distance minus near focus distance.
++    //
++    // Focus distances may change after starting auto focus, canceling auto
++    // focus, or starting the preview. Applications can read this anytime to get
++    // the latest focus distances. If the focus mode is FOCUS_MODE_CONTINUOUS,
++    // focus distances may change from time to time.
++    //
++    // This is intended to estimate the distance between the camera and the
++    // subject. After autofocus, the subject distance may be within near and far
++    // focus distance. However, the precision depends on the camera hardware,
++    // autofocus algorithm, the focus area, and the scene. The error can be
++    // large and it should be only used as a reference.
++    //
++    // Far focus distance > optimal focus distance > near focus distance. If
++    // the far focus distance is infinity, the value should be "Infinity" (case
++    // sensitive). The format is three float values separated by commas. The
++    // first is near focus distance. The second is optimal focus distance. The
++    // third is far focus distance.
++    // Example value: "0.95,1.9,Infinity" or "0.049,0.05,0.051". Read only.
++    static const char KEY_FOCUS_DISTANCES[];
++
++    // The current dimensions in pixels (width x height) for video frames.
++    // The width and height must be one of the supported sizes retrieved
++    // via KEY_SUPPORTED_VIDEO_SIZES.
++    // Example value: "1280x720". Read/write.
++    static const char KEY_VIDEO_SIZE[];
++    // A list of the supported dimensions in pixels (width x height)
++    // for video frames. See CAMERA_MSG_VIDEO_FRAME for details in
++    // frameworks/base/include/camera/Camera.h.
++    // Example: "176x144,1280x720". Read only.
++    static const char KEY_SUPPORTED_VIDEO_SIZES[];
++
++    // The maximum number of detected faces supported by hardware face
++    // detection. If the value is 0, hardware face detection is not supported.
++    // Example: "5". Read only
++    static const char KEY_MAX_NUM_DETECTED_FACES_HW[];
++
++    // The maximum number of detected faces supported by software face
++    // detection. If the value is 0, software face detection is not supported.
++    // Example: "5". Read only
++    static const char KEY_MAX_NUM_DETECTED_FACES_SW[];
++
++    // Preferred preview frame size in pixels for video recording.
++    // The width and height must be one of the supported sizes retrieved
++    // via KEY_SUPPORTED_PREVIEW_SIZES. This key can be used only when
++    // getSupportedVideoSizes() does not return an empty Vector of Size.
++    // Camcorder applications are recommended to set the preview size
++    // to a value that is not larger than the preferred preview size.
++    // In other words, the product of the width and height of the
++    // preview size should not be larger than that of the preferred
++    // preview size. In addition, we recommend to choos a preview size
++    // that has the same aspect ratio as the resolution of video to be
++    // recorded.
++    // Example value: "800x600". Read only.
++    static const char KEY_PREFERRED_PREVIEW_SIZE_FOR_VIDEO[];
++
++    // The image format for video frames. See CAMERA_MSG_VIDEO_FRAME in
++    // frameworks/base/include/camera/Camera.h.
++    // Example value: "yuv420sp" or PIXEL_FORMAT_XXX constants. Read only.
++    static const char KEY_VIDEO_FRAME_FORMAT[];
++
++    // Sets the hint of the recording mode. If this is true, MediaRecorder.start
++    // may be faster or has less glitches. This should be called before starting
++    // the preview for the best result. But it is allowed to change the hint
++    // while the preview is active. The default value is false.
++    //
++    // The apps can still call Camera.takePicture when the hint is true. The
++    // apps can call MediaRecorder.start when the hint is false. But the
++    // performance may be worse.
++    // Example value: "true" or "false". Read/write.
++    static const char KEY_RECORDING_HINT[];
++
++    // Returns true if video snapshot is supported. That is, applications
++    // can call Camera.takePicture during recording. Applications do not need to
++    // call Camera.startPreview after taking a picture. The preview will be
++    // still active. Other than that, taking a picture during recording is
++    // identical to taking a picture normally. All settings and methods related
++    // to takePicture work identically. Ex: KEY_PICTURE_SIZE,
++    // KEY_SUPPORTED_PICTURE_SIZES, KEY_JPEG_QUALITY, KEY_ROTATION, and etc.
++    // The picture will have an EXIF header. FLASH_MODE_AUTO and FLASH_MODE_ON
++    // also still work, but the video will record the flash.
++    //
++    // Applications can set shutter callback as null to avoid the shutter
++    // sound. It is also recommended to set raw picture and post view callbacks
++    // to null to avoid the interrupt of preview display.
++    //
++    // Field-of-view of the recorded video may be different from that of the
++    // captured pictures.
++    // Example value: "true" or "false". Read only.
++    static const char KEY_VIDEO_SNAPSHOT_SUPPORTED[];
++
++    // The state of the video stabilization. If set to true, both the
++    // preview stream and the recorded video stream are stabilized by
++    // the camera. Only valid to set if KEY_VIDEO_STABILIZATION_SUPPORTED is
++    // set to true.
++    //
++    // The value of this key can be changed any time the camera is
++    // open. If preview or recording is active, it is acceptable for
++    // there to be a slight video glitch when video stabilization is
++    // toggled on and off.
++    //
++    // This only stabilizes video streams (between-frames stabilization), and
++    // has no effect on still image capture.
++    static const char KEY_VIDEO_STABILIZATION[];
++
++    // Returns true if video stabilization is supported. That is, applications
++    // can set KEY_VIDEO_STABILIZATION to true and have a stabilized preview
++    // stream and record stabilized videos.
++    static const char KEY_VIDEO_STABILIZATION_SUPPORTED[];
++
++    // Supported modes for special effects with light.
++    // Example values: "lowlight,hdr".
++    static const char KEY_LIGHTFX[];
++
++    // Value for KEY_ZOOM_SUPPORTED or KEY_SMOOTH_ZOOM_SUPPORTED.
++    static const char TRUE[];
++    static const char FALSE[];
++
++    // Value for KEY_FOCUS_DISTANCES.
++    static const char FOCUS_DISTANCE_INFINITY[];
++
++    // Values for white balance settings.
++    static const char WHITE_BALANCE_AUTO[];
++    static const char WHITE_BALANCE_INCANDESCENT[];
++    static const char WHITE_BALANCE_FLUORESCENT[];
++    static const char WHITE_BALANCE_WARM_FLUORESCENT[];
++    static const char WHITE_BALANCE_DAYLIGHT[];
++    static const char WHITE_BALANCE_CLOUDY_DAYLIGHT[];
++    static const char WHITE_BALANCE_TWILIGHT[];
++    static const char WHITE_BALANCE_SHADE[];
++
++    // Values for effect settings.
++    static const char EFFECT_NONE[];
++    static const char EFFECT_MONO[];
++    static const char EFFECT_NEGATIVE[];
++    static const char EFFECT_SOLARIZE[];
++    static const char EFFECT_SEPIA[];
++    static const char EFFECT_POSTERIZE[];
++    static const char EFFECT_WHITEBOARD[];
++    static const char EFFECT_BLACKBOARD[];
++    static const char EFFECT_AQUA[];
++
++    // Values for antibanding settings.
++    static const char ANTIBANDING_AUTO[];
++    static const char ANTIBANDING_50HZ[];
++    static const char ANTIBANDING_60HZ[];
++    static const char ANTIBANDING_OFF[];
++
++    // Values for flash mode settings.
++    // Flash will not be fired.
++    static const char FLASH_MODE_OFF[];
++    // Flash will be fired automatically when required. The flash may be fired
++    // during preview, auto-focus, or snapshot depending on the driver.
++    static const char FLASH_MODE_AUTO[];
++    // Flash will always be fired during snapshot. The flash may also be
++    // fired during preview or auto-focus depending on the driver.
++    static const char FLASH_MODE_ON[];
++    // Flash will be fired in red-eye reduction mode.
++    static const char FLASH_MODE_RED_EYE[];
++    // Constant emission of light during preview, auto-focus and snapshot.
++    // This can also be used for video recording.
++    static const char FLASH_MODE_TORCH[];
++
++    // Values for scene mode settings.
++    static const char SCENE_MODE_AUTO[];
++    static const char SCENE_MODE_ACTION[];
++    static const char SCENE_MODE_PORTRAIT[];
++    static const char SCENE_MODE_LANDSCAPE[];
++    static const char SCENE_MODE_NIGHT[];
++    static const char SCENE_MODE_NIGHT_PORTRAIT[];
++    static const char SCENE_MODE_THEATRE[];
++    static const char SCENE_MODE_BEACH[];
++    static const char SCENE_MODE_SNOW[];
++    static const char SCENE_MODE_SUNSET[];
++    static const char SCENE_MODE_STEADYPHOTO[];
++    static const char SCENE_MODE_FIREWORKS[];
++    static const char SCENE_MODE_SPORTS[];
++    static const char SCENE_MODE_PARTY[];
++    static const char SCENE_MODE_CANDLELIGHT[];
++    // Applications are looking for a barcode. Camera driver will be optimized
++    // for barcode reading.
++    static const char SCENE_MODE_BARCODE[];
++    // A high-dynamic range mode. In this mode, the HAL module will use a
++    // capture strategy that extends the dynamic range of the captured
++    // image in some fashion. Only the final image is returned.
++    static const char SCENE_MODE_HDR[];
++
++    // Pixel color formats for KEY_PREVIEW_FORMAT, KEY_PICTURE_FORMAT,
++    // and KEY_VIDEO_FRAME_FORMAT
++    static const char PIXEL_FORMAT_YUV422SP[];
++    static const char PIXEL_FORMAT_YUV420SP[]; // NV21
++    static const char PIXEL_FORMAT_YUV422I[]; // YUY2
++    static const char PIXEL_FORMAT_YUV420P[]; // YV12
++    static const char PIXEL_FORMAT_RGB565[];
++    static const char PIXEL_FORMAT_RGBA8888[];
++    static const char PIXEL_FORMAT_JPEG[];
++    // Raw bayer format used for images, which is 10 bit precision samples
++    // stored in 16 bit words. The filter pattern is RGGB.
++    static const char PIXEL_FORMAT_BAYER_RGGB[];
++    // Pixel format is not known to the framework
++    static const char PIXEL_FORMAT_ANDROID_OPAQUE[];
++
++    // Values for focus mode settings.
++    // Auto-focus mode. Applications should call
++    // CameraHardwareInterface.autoFocus to start the focus in this mode.
++    static const char FOCUS_MODE_AUTO[];
++    // Focus is set at infinity. Applications should not call
++    // CameraHardwareInterface.autoFocus in this mode.
++    static const char FOCUS_MODE_INFINITY[];
++    // Macro (close-up) focus mode. Applications should call
++    // CameraHardwareInterface.autoFocus to start the focus in this mode.
++    static const char FOCUS_MODE_MACRO[];
++    // Focus is fixed. The camera is always in this mode if the focus is not
++    // adjustable. If the camera has auto-focus, this mode can fix the
++    // focus, which is usually at hyperfocal distance. Applications should
++    // not call CameraHardwareInterface.autoFocus in this mode.
++    static const char FOCUS_MODE_FIXED[];
++    // Extended depth of field (EDOF). Focusing is done digitally and
++    // continuously. Applications should not call
++    // CameraHardwareInterface.autoFocus in this mode.
++    static const char FOCUS_MODE_EDOF[];
++    // Continuous auto focus mode intended for video recording. The camera
++    // continuously tries to focus. This is the best choice for video
++    // recording because the focus changes smoothly . Applications still can
++    // call CameraHardwareInterface.takePicture in this mode but the subject may
++    // not be in focus. Auto focus starts when the parameter is set.
++    //
++    // Applications can call CameraHardwareInterface.autoFocus in this mode. The
++    // focus callback will immediately return with a boolean that indicates
++    // whether the focus is sharp or not. The focus position is locked after
++    // autoFocus call. If applications want to resume the continuous focus,
++    // cancelAutoFocus must be called. Restarting the preview will not resume
++    // the continuous autofocus. To stop continuous focus, applications should
++    // change the focus mode to other modes.
++    static const char FOCUS_MODE_CONTINUOUS_VIDEO[];
++    // Continuous auto focus mode intended for taking pictures. The camera
++    // continuously tries to focus. The speed of focus change is more aggressive
++    // than FOCUS_MODE_CONTINUOUS_VIDEO. Auto focus starts when the parameter is
++    // set.
++    //
++    // Applications can call CameraHardwareInterface.autoFocus in this mode. If
++    // the autofocus is in the middle of scanning, the focus callback will
++    // return when it completes. If the autofocus is not scanning, focus
++    // callback will immediately return with a boolean that indicates whether
++    // the focus is sharp or not. The apps can then decide if they want to take
++    // a picture immediately or to change the focus mode to auto, and run a full
++    // autofocus cycle. The focus position is locked after autoFocus call. If
++    // applications want to resume the continuous focus, cancelAutoFocus must be
++    // called. Restarting the preview will not resume the continuous autofocus.
++    // To stop continuous focus, applications should change the focus mode to
++    // other modes.
++    static const char FOCUS_MODE_CONTINUOUS_PICTURE[];
++
++    // Values for light special effects
++    // Low-light enhancement mode
++    static const char LIGHTFX_LOWLIGHT[];
++    // High-dynamic range mode
++    static const char LIGHTFX_HDR[];
++
++    /**
++     * Returns the the supported preview formats as an enum given in graphics.h
++     * corrsponding to the format given in the input string or -1 if no such
++     * conversion exists.
++     */
++    static int previewFormatToEnum(const char* format);
++
++private:
++    DefaultKeyedVector<String8,String8>    mMap;
++};
++
++}; // namespace android
++
++#endif
+diff --git a/camera/camera/CameraParameters2.h b/camera/camera/CameraParameters2.h
+new file mode 100644
+index 0000000..5fae079
+--- /dev/null
++++ b/camera/camera/CameraParameters2.h
+@@ -0,0 +1,203 @@
++/*
++ * Copyright (C) 2014 The Android Open Source Project
++ *
++ * Licensed under the Apache License, Version 2.0 (the "License");
++ * you may not use this file except in compliance with the License.
++ * You may obtain a copy of the License at
++ *
++ *      http://www.apache.org/licenses/LICENSE-2.0
++ *
++ * Unless required by applicable law or agreed to in writing, software
++ * distributed under the License is distributed on an "AS IS" BASIS,
++ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++ * See the License for the specific language governing permissions and
++ * limitations under the License.
++ */
++
++#ifndef ANDROID_HARDWARE_CAMERA_PARAMETERS2_H
++#define ANDROID_HARDWARE_CAMERA_PARAMETERS2_H
++
++#include <utils/Vector.h>
++#include <utils/String8.h>
++#include <camera/CameraParameters.h>
++
++namespace android {
++
++/**
++ * A copy of CameraParameters plus ABI-breaking changes. Needed
++ * because some camera HALs directly link to CameraParameters and cannot
++ * tolerate an ABI change.
++ */
++class CameraParameters2
++{
++public:
++    CameraParameters2();
++    CameraParameters2(const String8 &params) { unflatten(params); }
++    ~CameraParameters2();
++
++    String8 flatten() const;
++    void unflatten(const String8 &params);
++
++    void set(const char *key, const char *value);
++    void set(const char *key, int value);
++    void setFloat(const char *key, float value);
++    // Look up string value by key.
++    // -- The string remains valid until the next set/remove of the same key,
++    //    or until the map gets cleared.
++    const char *get(const char *key) const;
++    int getInt(const char *key) const;
++    float getFloat(const char *key) const;
++
++    // Compare the order that key1 was set vs the order that key2 was set.
++    //
++    // Sets the order parameter to an integer less than, equal to, or greater
++    // than zero if key1's set order was respectively, to be less than, to
++    // match, or to be greater than key2's set order.
++    //
++    // Error codes:
++    //  * NAME_NOT_FOUND - if either key has not been set previously
++    //  * BAD_VALUE - if any of the parameters are NULL
++    status_t compareSetOrder(const char *key1, const char *key2,
++            /*out*/
++            int *order) const;
++
++    void remove(const char *key);
++
++    void setPreviewSize(int width, int height);
++    void getPreviewSize(int *width, int *height) const;
++    void getSupportedPreviewSizes(Vector<Size> &sizes) const;
++
++    // Set the dimensions in pixels to the given width and height
++    // for video frames. The given width and height must be one
++    // of the supported dimensions returned from
++    // getSupportedVideoSizes(). Must not be called if
++    // getSupportedVideoSizes() returns an empty Vector of Size.
++    void setVideoSize(int width, int height);
++    // Retrieve the current dimensions (width and height)
++    // in pixels for video frames, which must be one of the
++    // supported dimensions returned from getSupportedVideoSizes().
++    // Must not be called if getSupportedVideoSizes() returns an
++    // empty Vector of Size.
++    void getVideoSize(int *width, int *height) const;
++    // Retrieve a Vector of supported dimensions (width and height)
++    // in pixels for video frames. If sizes returned from the method
++    // is empty, the camera does not support calls to setVideoSize()
++    // or getVideoSize(). In adddition, it also indicates that
++    // the camera only has a single output, and does not have
++    // separate output for video frames and preview frame.
++    void getSupportedVideoSizes(Vector<Size> &sizes) const;
++    // Retrieve the preferred preview size (width and height) in pixels
++    // for video recording. The given width and height must be one of
++    // supported preview sizes returned from getSupportedPreviewSizes().
++    // Must not be called if getSupportedVideoSizes() returns an empty
++    // Vector of Size. If getSupportedVideoSizes() returns an empty
++    // Vector of Size, the width and height returned from this method
++    // is invalid, and is "-1x-1".
++    void getPreferredPreviewSizeForVideo(int *width, int *height) const;
++
++    void setPreviewFrameRate(int fps);
++    int getPreviewFrameRate() const;
++    void getPreviewFpsRange(int *min_fps, int *max_fps) const;
++    void setPreviewFpsRange(int min_fps, int max_fps);
++    void setPreviewFormat(const char *format);
++    const char *getPreviewFormat() const;
++    void setPictureSize(int width, int height);
++    void getPictureSize(int *width, int *height) const;
++    void getSupportedPictureSizes(Vector<Size> &sizes) const;
++    void setPictureFormat(const char *format);
++    const char *getPictureFormat() const;
++
++    void dump() const;
++    status_t dump(int fd, const Vector<String16>& args) const;
++
++private:
++
++    // Quick and dirty map that maintains insertion order
++    template <typename KeyT, typename ValueT>
++    struct OrderedKeyedVector {
++
++        ssize_t add(const KeyT& key, const ValueT& value) {
++            return mList.add(Pair(key, value));
++        }
++
++        size_t size() const {
++            return mList.size();
++        }
++
++        const KeyT& keyAt(size_t idx) const {
++            return mList[idx].mKey;
++        }
++
++        const ValueT& valueAt(size_t idx) const {
++            return mList[idx].mValue;
++        }
++
++        const ValueT& valueFor(const KeyT& key) const {
++            ssize_t i = indexOfKey(key);
++            LOG_ALWAYS_FATAL_IF(i<0, "%s: key not found", __PRETTY_FUNCTION__);
++
++            return valueAt(i);
++        }
++
++        ssize_t indexOfKey(const KeyT& key) const {
++                size_t vectorIdx = 0;
++                for (; vectorIdx < mList.size(); ++vectorIdx) {
++                    if (mList[vectorIdx].mKey == key) {
++                        return (ssize_t) vectorIdx;
++                    }
++                }
++
++                return NAME_NOT_FOUND;
++        }
++
++        ssize_t removeItem(const KeyT& key) {
++            ssize_t vectorIdx = indexOfKey(key);
++
++            if (vectorIdx < 0) {
++                return vectorIdx;
++            }
++
++            return mList.removeAt(vectorIdx);
++        }
++
++        void clear() {
++            mList.clear();
++        }
++
++        // Same as removing and re-adding. The key's index changes to max.
++        ssize_t replaceValueFor(const KeyT& key, const ValueT& value) {
++            removeItem(key);
++            return add(key, value);
++        }
++
++    private:
++
++        struct Pair {
++            Pair() : mKey(), mValue() {}
++            Pair(const KeyT& key, const ValueT& value) :
++                    mKey(key),
++                    mValue(value) {}
++            KeyT   mKey;
++            ValueT mValue;
++        };
++
++        Vector<Pair> mList;
++    };
++
++    /**
++     * Order matters: Keys that are set() later are stored later in the map.
++     *
++     * If two keys have meaning that conflict, then the later-set key
++     * wins.
++     *
++     * For example, preview FPS and preview FPS range conflict since only
++     * we only want to use the FPS range if that's the last thing that was set.
++     * So in that case, only use preview FPS range if it was set later than
++     * the preview FPS.
++     */
++    OrderedKeyedVector<String8,String8>    mMap;
++};
++
++}; // namespace android
++
++#endif
+diff --git a/camera/camera/CameraSessionStats.h b/camera/camera/CameraSessionStats.h
+new file mode 100644
+index 0000000..34ee882
+--- /dev/null
++++ b/camera/camera/CameraSessionStats.h
+@@ -0,0 +1,185 @@
++/*
++ * Copyright (C) 2020 The Android Open Source Project
++ *
++ * Licensed under the Apache License, Version 2.0 (the "License");
++ * you may not use this file except in compliance with the License.
++ * You may obtain a copy of the License at
++ *
++ *      http://www.apache.org/licenses/LICENSE-2.0
++ *
++ * Unless required by applicable law or agreed to in writing, software
++ * distributed under the License is distributed on an "AS IS" BASIS,
++ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++ * See the License for the specific language governing permissions and
++ * limitations under the License.
++ */
++
++#ifndef ANDROID_HARDWARE_CAMERA_SERVICE_SESSION_STATS_H
++#define ANDROID_HARDWARE_CAMERA_SERVICE_SESSION_STATS_H
++
++#include <string>
++
++#include <binder/Parcelable.h>
++
++#include <camera/CameraMetadata.h>
++#include <android/hardware/CameraExtensionSessionStats.h>
++
++namespace android {
++namespace hardware {
++
++/**
++ * Camera stream info and statistics
++ */
++class CameraStreamStats : public android::Parcelable {
++public:
++    enum HistogramType {
++        HISTOGRAM_TYPE_UNKNOWN = 0,
++        HISTOGRAM_TYPE_CAPTURE_LATENCY = 1,
++    };
++
++    int mWidth;
++    int mHeight;
++    int mFormat;
++    float mMaxPreviewFps;
++    int mDataSpace;
++    int64_t mUsage;
++
++    // The number of requested buffers
++    int64_t mRequestCount;
++    // The number of buffer errors
++    int64_t mErrorCount;
++
++    // The capture latency of 1st request for this stream
++    int32_t mStartLatencyMs;
++
++    // Buffer count info
++    int mMaxHalBuffers;
++    int mMaxAppBuffers;
++
++    // Histogram type. So far only capture latency histogram is supported.
++    int mHistogramType;
++    // The bounary values separating adjacent histogram bins.
++    // A vector of {h1, h2, h3} represents bins of [0, h1), [h1, h2), [h2, h3),
++    // and [h3, infinity)
++    std::vector<float> mHistogramBins;
++    // The counts for all histogram bins.
++    // size(mHistogramBins) + 1 = size(mHistogramCounts)
++    std::vector<int64_t> mHistogramCounts;
++
++    // Dynamic range profile
++    int64_t mDynamicRangeProfile;
++    // Stream use case
++    int64_t mStreamUseCase;
++    // Color space
++    int32_t mColorSpace;
++
++    CameraStreamStats() :
++            mWidth(0), mHeight(0), mFormat(0), mMaxPreviewFps(0), mDataSpace(0), mUsage(0),
++            mRequestCount(0), mErrorCount(0), mStartLatencyMs(0),
++            mMaxHalBuffers(0), mMaxAppBuffers(0), mHistogramType(HISTOGRAM_TYPE_UNKNOWN),
++            mDynamicRangeProfile(ANDROID_REQUEST_AVAILABLE_DYNAMIC_RANGE_PROFILES_MAP_STANDARD),
++            mStreamUseCase(ANDROID_SCALER_AVAILABLE_STREAM_USE_CASES_DEFAULT),
++            mColorSpace(ANDROID_REQUEST_AVAILABLE_COLOR_SPACE_PROFILES_MAP_UNSPECIFIED) {}
++    CameraStreamStats(int width, int height, int format, float maxPreviewFps, int dataSpace,
++            int64_t usage, int maxHalBuffers, int maxAppBuffers, int dynamicRangeProfile,
++            int streamUseCase, int32_t colorSpace)
++            : mWidth(width), mHeight(height), mFormat(format), mMaxPreviewFps(maxPreviewFps),
++              mDataSpace(dataSpace), mUsage(usage), mRequestCount(0), mErrorCount(0),
++              mStartLatencyMs(0), mMaxHalBuffers(maxHalBuffers), mMaxAppBuffers(maxAppBuffers),
++              mHistogramType(HISTOGRAM_TYPE_UNKNOWN),
++              mDynamicRangeProfile(dynamicRangeProfile),
++              mStreamUseCase(streamUseCase),
++              mColorSpace(colorSpace) {}
++
++    virtual status_t readFromParcel(const android::Parcel* parcel) override;
++    virtual status_t writeToParcel(android::Parcel* parcel) const override;
++};
++
++/**
++ * Camera session statistics
++ *
++ * This includes session wide info and stream statistics.
++ */
++class CameraSessionStats : public android::Parcelable {
++public:
++    /**
++     * Values for notifyCameraState newCameraState
++     */
++    static const int CAMERA_STATE_OPEN;
++    static const int CAMERA_STATE_ACTIVE;
++    static const int CAMERA_STATE_IDLE;
++    static const int CAMERA_STATE_CLOSED;
++
++    /**
++     * Values for notifyCameraState facing
++     */
++    static const int CAMERA_FACING_BACK;
++    static const int CAMERA_FACING_FRONT;
++    static const int CAMERA_FACING_EXTERNAL;
++
++    /**
++     * Values for notifyCameraState api level
++     */
++    static const int CAMERA_API_LEVEL_1;
++    static const int CAMERA_API_LEVEL_2;
++
++    std::string mCameraId;
++    int mFacing;
++    int mNewCameraState;
++    std::string mClientName;
++    int mApiLevel;
++    bool mIsNdk;
++    // latency in ms for camera open, close, or session creation.
++    int mLatencyMs;
++
++    /*
++     * A randomly generated identifier to map the open/active/idle/close stats to each other after
++     * being logged. Every 'open' event will have a newly generated id which will be logged with
++     * active/idle/closed that correspond to the particular 'open' event.
++     *
++     * This ID is not meant to be globally unique forever. Probabilistically, this ID can be
++     * safely considered unique across all logs from one android build for 48 to 72 hours from
++     * its generation. Chances of identifier collisions are significant past a week or two.
++     *
++     * NOTE: There are no guarantees that the identifiers will be unique. The probability of
++     * collision within a short timeframe is low, but any system consuming these identifiers at
++     * scale should handle identifier collisions, potentially even from the same device.
++     */
++    int64_t mLogId;
++
++    float mMaxPreviewFps;
++
++    // Session info and statistics
++    int mSessionType;
++    int mInternalReconfigure;
++    // The number of capture requests
++    int64_t mRequestCount;
++    // The number of result error
++    int64_t mResultErrorCount;
++    // Whether the device runs into an error state
++    bool mDeviceError;
++    std::vector<CameraStreamStats> mStreamStats;
++    std::string mUserTag;
++    int mVideoStabilizationMode;
++    bool mUsedUltraWide;
++    bool mUsedZoomOverride;
++    int mSessionIndex;
++
++    CameraExtensionSessionStats mCameraExtensionSessionStats;
++
++    std::pair<int32_t, int32_t> mMostRequestedFpsRange;
++
++    // Constructors
++    CameraSessionStats();
++    CameraSessionStats(const std::string& cameraId, int facing, int newCameraState,
++                       const std::string& clientName, int apiLevel, bool isNdk, int32_t latencyMs,
++                       int64_t logId);
++
++    virtual status_t readFromParcel(const android::Parcel* parcel) override;
++    virtual status_t writeToParcel(android::Parcel* parcel) const override;
++};
++
++}; // namespace hardware
++}; // namespace android
++
++#endif // ANDROID_HARDWARE_CAMERA_SERVICE_SESSION_STATS_H
+diff --git a/camera/camera/CameraUtils.h b/camera/camera/CameraUtils.h
+new file mode 100644
+index 0000000..766cac1
+--- /dev/null
++++ b/camera/camera/CameraUtils.h
+@@ -0,0 +1,68 @@
++/*
++ * Copyright (C) 2014 The Android Open Source Project
++ *
++ * Licensed under the Apache License, Version 2.0 (the "License");
++ * you may not use this file except in compliance with the License.
++ * You may obtain a copy of the License at
++ *
++ *      http://www.apache.org/licenses/LICENSE-2.0
++ *
++ * Unless required by applicable law or agreed to in writing, software
++ * distributed under the License is distributed on an "AS IS" BASIS,
++ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++ * See the License for the specific language governing permissions and
++ * limitations under the License.
++ */
++
++#ifndef ANDROID_CAMERA_CLIENT_CAMERAUTILS_H
++#define ANDROID_CAMERA_CLIENT_CAMERAUTILS_H
++
++#include <binder/IMemory.h>
++#include <camera/CameraMetadata.h>
++#include <utils/Errors.h>
++#include <utils/RefBase.h>
++
++#include <stdint.h>
++
++namespace android {
++
++// Device id of a context associated with the default device.
++constexpr int32_t kDefaultDeviceId = 0;
++
++/**
++ * CameraUtils contains utility methods that are shared between the native
++ * camera client, and the camera service.
++ */
++class CameraUtils {
++    public:
++        /**
++         * Calculate the ANativeWindow transform from the static camera
++         * metadata.  This is based on the sensor orientation and lens facing
++         * attributes of the camera device.
++         *
++         * If mirrorMode is not AUTO, it will be used to override the lens
++         * facing based mirror.
++         *
++         * Returns OK on success, or a negative error code.
++         */
++        static status_t getRotationTransform(const CameraMetadata& staticInfo,
++                int mirrorMode, bool enableTransformInverseDisplay, /*out*/int32_t* transform);
++
++        /**
++         * Check if the image data is VideoNativeHandleMetadata, that contains a native handle.
++         */
++        static bool isNativeHandleMetadata(const sp<IMemory>& imageData);
++
++        /**
++         * Check if camera service is disabled on this device
++         */
++        static bool isCameraServiceDisabled();
++
++    private:
++        CameraUtils();
++};
++
++} /* namespace android */
++
++#endif /* ANDROID_CAMERA_CLIENT_CAMERAUTILS_H */
++
+diff --git a/camera/camera/CaptureResult.h b/camera/camera/CaptureResult.h
+new file mode 100644
+index 0000000..cc6b529
+--- /dev/null
++++ b/camera/camera/CaptureResult.h
+@@ -0,0 +1,197 @@
++/*
++ * Copyright (C) 2014 The Android Open Source Project
++ *
++ * Licensed under the Apache License, Version 2.0 (the "License");
++ * you may not use this file except in compliance with the License.
++ * You may obtain a copy of the License at
++ *
++ *      http://www.apache.org/licenses/LICENSE-2.0
++ *
++ * Unless required by applicable law or agreed to in writing, software
++ * distributed under the License is distributed on an "AS IS" BASIS,
++ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++ * See the License for the specific language governing permissions and
++ * limitations under the License.
++ */
++
++#ifndef ANDROID_HARDWARE_CAPTURERESULT_H
++#define ANDROID_HARDWARE_CAPTURERESULT_H
++
++#include <utils/RefBase.h>
++#include <binder/Parcelable.h>
++#include <camera/CameraMetadata.h>
++#include <android/hardware/camera2/CameraMetadataInfo.h>
++
++namespace android {
++
++namespace hardware {
++namespace camera2 {
++namespace impl {
++
++/**
++ * CaptureResultExtras is a structure to encapsulate various indices for a capture result.
++ * These indices are framework-internal and not sent to the HAL.
++ */
++struct CaptureResultExtras : public android::Parcelable {
++    /**
++     * An integer to index the request sequence that this result belongs to.
++     */
++    int32_t requestId;
++
++    /**
++     * An integer to index this result inside a request sequence, starting from 0.
++     */
++    int32_t burstId;
++
++    /**
++     * TODO: Add documentation for this field.
++     */
++    int32_t afTriggerId;
++
++    /**
++     * TODO: Add documentation for this field.
++     */
++    int32_t precaptureTriggerId;
++
++    /**
++     * A 64bit integer to index the frame number associated with this result.
++     */
++    int64_t frameNumber;
++
++    /**
++     * The partial result count (index) for this capture result.
++     */
++    int32_t partialResultCount;
++
++    /**
++     * For buffer drop errors, the stream ID for the stream that lost a buffer.
++     * Otherwise -1.
++     */
++    int32_t errorStreamId;
++
++    /**
++     * For capture result errors, the physical camera ID in case the respective request contains
++     * a reference to physical camera device.
++     * Empty otherwise.
++     */
++    std::string errorPhysicalCameraId;
++
++    // The last completed frame numbers shouldn't be checked in onResultReceived() and notifyError()
++    // because the output buffers could be arriving after onResultReceived() and
++    // notifyError(). Given this constraint, we check it for each
++    // onCaptureStarted, and if there is no further onCaptureStarted(),
++    // check for onDeviceIdle() to clear out all pending frame numbers.
++
++    /**
++     * The latest regular request frameNumber for which all buffers and capture result have been
++     * returned or notified as an BUFFER_ERROR/RESULT_ERROR/REQUEST_ERROR. -1 if
++     * none has completed.
++     */
++    int64_t lastCompletedRegularFrameNumber;
++
++    /**
++     * The latest reprocess request frameNumber for which all buffers and capture result have been
++     * returned or notified as an BUFFER_ERROR/RESULT_ERROR/REQUEST_ERROR. -1 if
++     * none has completed.
++     */
++    int64_t lastCompletedReprocessFrameNumber;
++
++    /**
++     * The latest Zsl request frameNumber for which all buffers and capture result have been
++     * returned or notified as an BUFFER_ERROR/RESULT_ERROR/REQUEST_ERROR. -1 if
++     * none has completed.
++     */
++    int64_t lastCompletedZslFrameNumber;
++
++    /**
++     * Whether the readoutTimestamp variable is valid and should be used.
++     */
++    bool hasReadoutTimestamp;
++
++    /**
++     * The readout timestamp of the capture. Its value is equal to the
++     * start-of-exposure timestamp plus the exposure time (and a possible fixed
++     * offset due to sensor crop).
++     */
++    int64_t readoutTimestamp;
++
++    /**
++     * Constructor initializes object as invalid by setting requestId to be -1.
++     */
++    CaptureResultExtras()
++        : requestId(-1),
++          burstId(0),
++          afTriggerId(0),
++          precaptureTriggerId(0),
++          frameNumber(0),
++          partialResultCount(0),
++          errorStreamId(-1),
++          errorPhysicalCameraId(),
++          lastCompletedRegularFrameNumber(-1),
++          lastCompletedReprocessFrameNumber(-1),
++          lastCompletedZslFrameNumber(-1),
++          hasReadoutTimestamp(false),
++          readoutTimestamp(0) {
++    }
++
++    /**
++     * This function returns true if it's a valid CaptureResultExtras object.
++     * Otherwise, returns false. It is valid only when requestId is non-negative.
++     */
++    bool isValid();
++
++    virtual status_t                readFromParcel(const android::Parcel* parcel) override;
++    virtual status_t                writeToParcel(android::Parcel* parcel) const override;
++};
++
++struct PhysicalCaptureResultInfo : public android::Parcelable {
++    using CameraMetadataInfo = android::hardware::camera2::CameraMetadataInfo;
++    PhysicalCaptureResultInfo()
++        : mPhysicalCameraId(),
++          mCameraMetadataInfo() {
++    }
++    PhysicalCaptureResultInfo(const std::string& cameraId,
++            const CameraMetadata& cameraMetadata)
++            : mPhysicalCameraId(cameraId) {
++              mCameraMetadataInfo.set<CameraMetadataInfo::metadata>(cameraMetadata);
++    }
++
++   PhysicalCaptureResultInfo(const std::string& cameraId,
++            uint64_t fmqSize)
++            : mPhysicalCameraId(cameraId) {
++              mCameraMetadataInfo.set<CameraMetadataInfo::fmqSize>(fmqSize);
++    }
++
++    std::string mPhysicalCameraId;
++
++    CameraMetadataInfo mCameraMetadataInfo;
++
++    virtual status_t                readFromParcel(const android::Parcel* parcel) override;
++    virtual status_t                writeToParcel(android::Parcel* parcel) const override;
++};
++
++} // namespace impl
++} // namespace camera2
++} // namespace hardware
++
++using hardware::camera2::impl::CaptureResultExtras;
++using hardware::camera2::impl::PhysicalCaptureResultInfo;
++
++struct CaptureResult : public virtual LightRefBase<CaptureResult> {
++    CameraMetadata          mMetadata;
++    std::vector<PhysicalCaptureResultInfo> mPhysicalMetadatas;
++    CaptureResultExtras     mResultExtras;
++
++    CaptureResult();
++
++    CaptureResult(const CaptureResult& otherResult);
++
++    CaptureResult(CaptureResult &&captureResult);
++
++    status_t                readFromParcel(android::Parcel* parcel);
++    status_t                writeToParcel(android::Parcel* parcel) const;
++};
++
++}
++
++#endif /* ANDROID_HARDWARE_CAPTURERESULT_H */
+diff --git a/camera/camera/ICameraRecordingProxy.h b/camera/camera/ICameraRecordingProxy.h
+new file mode 100644
+index 0000000..a7af6f1
+--- /dev/null
++++ b/camera/camera/ICameraRecordingProxy.h
+@@ -0,0 +1,107 @@
++/*
++ * Copyright (C) 2011 The Android Open Source Project
++ *
++ * Licensed under the Apache License, Version 2.0 (the "License");
++ * you may not use this file except in compliance with the License.
++ * You may obtain a copy of the License at
++ *
++ *      http://www.apache.org/licenses/LICENSE-2.0
++ *
++ * Unless required by applicable law or agreed to in writing, software
++ * distributed under the License is distributed on an "AS IS" BASIS,
++ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++ * See the License for the specific language governing permissions and
++ * limitations under the License.
++ */
++
++#ifndef ANDROID_HARDWARE_ICAMERA_RECORDING_PROXY_H
++#define ANDROID_HARDWARE_ICAMERA_RECORDING_PROXY_H
++
++#include <vector>
++#include <binder/IInterface.h>
++#include <cutils/native_handle.h>
++#include <utils/RefBase.h>
++
++namespace android {
++
++class ICameraRecordingProxyListener;
++class IMemory;
++class Parcel;
++
++/*
++ * The purpose of ICameraRecordingProxy and ICameraRecordingProxyListener is to
++ * allow applications using the camera during recording.
++ *
++ * Camera service allows only one client at a time. Since camcorder application
++ * needs to own the camera to do things like zoom, the media recorder cannot
++ * access the camera directly during recording. So ICameraRecordingProxy is a
++ * proxy of ICamera, which allows the media recorder to start/stop the recording
++ * and release recording frames. ICameraRecordingProxyListener is an interface
++ * that allows the recorder to receive video frames during recording.
++ *
++ * ICameraRecordingProxy
++ *   startRecording()
++ *   stopRecording()
++ *   releaseRecordingFrame()
++ *
++ * ICameraRecordingProxyListener
++ *   dataCallbackTimestamp()
++
++ * The camcorder app opens the camera and starts the preview. The app passes
++ * ICamera and ICameraRecordingProxy to the media recorder by
++ * MediaRecorder::setCamera(). The recorder uses ICamera to setup the camera in
++ * MediaRecorder::start(). After setup, the recorder disconnects from camera
++ * service. The recorder calls ICameraRecordingProxy::startRecording() and
++ * passes a ICameraRecordingProxyListener to the app. The app connects back to
++ * camera service and starts the recording. The app owns the camera and can do
++ * things like zoom. The media recorder receives the video frames from the
++ * listener and releases them by ICameraRecordingProxy::releaseRecordingFrame.
++ * The recorder calls ICameraRecordingProxy::stopRecording() to stop the
++ * recording.
++ *
++ * The call sequences are as follows:
++ * 1. The app: Camera.unlock().
++ * 2. The app: MediaRecorder.setCamera().
++ * 3. Start recording
++ *    (1) The app: MediaRecorder.start().
++ *    (2) The recorder: ICamera.unlock() and ICamera.disconnect().
++ *    (3) The recorder: ICameraRecordingProxy.startRecording().
++ *    (4) The app: ICamera.reconnect().
++ *    (5) The app: ICamera.startRecording().
++ * 4. During recording
++ *    (1) The recorder: receive frames from ICameraRecordingProxyListener.dataCallbackTimestamp()
++ *    (2) The recorder: release frames by ICameraRecordingProxy.releaseRecordingFrame().
++ * 5. Stop recording
++ *    (1) The app: MediaRecorder.stop()
++ *    (2) The recorder: ICameraRecordingProxy.stopRecording().
++ *    (3) The app: ICamera.stopRecording().
++ */
++
++class ICameraRecordingProxy: public IInterface
++{
++public:
++    DECLARE_META_INTERFACE(CameraRecordingProxy);
++
++    virtual status_t        startRecording(const sp<ICameraRecordingProxyListener>& listener) = 0;
++    virtual status_t        startRecording();
++    virtual void            stopRecording() = 0;
++    virtual void            releaseRecordingFrame(const sp<IMemory>& mem) = 0;
++    virtual void            releaseRecordingFrameHandle(native_handle_t *handle) = 0;
++    virtual void            releaseRecordingFrameHandleBatch(
++                                    const std::vector<native_handle_t*>& handles) = 0;
++};
++
++// ----------------------------------------------------------------------------
++
++class BnCameraRecordingProxy: public BnInterface<ICameraRecordingProxy>
++{
++public:
++    virtual status_t    onTransact( uint32_t code,
++                                    const Parcel& data,
++                                    Parcel* reply,
++                                    uint32_t flags = 0);
++};
++
++}; // namespace android
++
++#endif
+diff --git a/camera/camera/ICameraRecordingProxyListener.h b/camera/camera/ICameraRecordingProxyListener.h
+new file mode 100644
+index 0000000..da03c56
+--- /dev/null
++++ b/camera/camera/ICameraRecordingProxyListener.h
+@@ -0,0 +1,61 @@
++/*
++ * Copyright (C) 2011 The Android Open Source Project
++ *
++ * Licensed under the Apache License, Version 2.0 (the "License");
++ * you may not use this file except in compliance with the License.
++ * You may obtain a copy of the License at
++ *
++ *      http://www.apache.org/licenses/LICENSE-2.0
++ *
++ * Unless required by applicable law or agreed to in writing, software
++ * distributed under the License is distributed on an "AS IS" BASIS,
++ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++ * See the License for the specific language governing permissions and
++ * limitations under the License.
++ */
++
++#ifndef ANDROID_HARDWARE_ICAMERA_RECORDING_PROXY_LISTENER_H
++#define ANDROID_HARDWARE_ICAMERA_RECORDING_PROXY_LISTENER_H
++
++#include <vector>
++#include <binder/IInterface.h>
++#include <cutils/native_handle.h>
++#include <stdint.h>
++#include <utils/RefBase.h>
++#include <utils/Timers.h>
++
++namespace android {
++
++class Parcel;
++class IMemory;
++
++class ICameraRecordingProxyListener: public IInterface
++{
++public:
++    DECLARE_META_INTERFACE(CameraRecordingProxyListener);
++
++    virtual void dataCallbackTimestamp(nsecs_t timestamp, int32_t msgType,
++                                       const sp<IMemory>& data) = 0;
++
++    virtual void recordingFrameHandleCallbackTimestamp(nsecs_t timestamp,
++                                                       native_handle_t* handle) = 0;
++
++    virtual void recordingFrameHandleCallbackTimestampBatch(
++            const std::vector<nsecs_t>& timestamps,
++            const std::vector<native_handle_t*>& handles) = 0;
++};
++
++// ----------------------------------------------------------------------------
++
++class BnCameraRecordingProxyListener: public BnInterface<ICameraRecordingProxyListener>
++{
++public:
++    virtual status_t    onTransact( uint32_t code,
++                                    const Parcel& data,
++                                    Parcel* reply,
++                                    uint32_t flags = 0);
++};
++
++}; // namespace android
++
++#endif
+diff --git a/camera/camera/StringUtils.h b/camera/camera/StringUtils.h
+new file mode 100644
+index 0000000..80c419f
+--- /dev/null
++++ b/camera/camera/StringUtils.h
+@@ -0,0 +1,81 @@
++/*
++ * Copyright (C) 2023 The Android Open Source Project
++ *
++ * Licensed under the Apache License, Version 2.0 (the "License");
++ * you may not use this file except in compliance with the License.
++ * You may obtain a copy of the License at
++ *
++ *      http://www.apache.org/licenses/LICENSE-2.0
++ *
++ * Unless required by applicable law or agreed to in writing, software
++ * distributed under the License is distributed on an "AS IS" BASIS,
++ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++ * See the License for the specific language governing permissions and
++ * limitations under the License.
++ */
++
++#ifndef ANDROID_SERVERS_CAMERA_STRINGUTILS_H
++#define ANDROID_SERVERS_CAMERA_STRINGUTILS_H
++
++#include <memory>
++#include <optional>
++#include <string>
++
++#include <fmt/printf.h>
++#include <utils/String8.h>
++#include <utils/String16.h>
++
++namespace android {
++    inline String8 toString8(const std::string &str) {
++        return String8(str.c_str());
++    }
++
++    inline String8 toString8(const String16 &str) {
++        return String8(str);
++    }
++
++    inline String8 toString8(const char *str) {
++        return String8(str);
++    }
++
++    inline String16 toString16(const std::string &str) {
++        return String16(str.c_str());
++    }
++
++    inline String16 toString16(const String8 &str) {
++        return String16(str);
++    }
++
++    inline String16 toString16(const char *str) {
++        return String16(str);
++    }
++
++    inline std::optional<String16> toString16(std::optional<std::string> str) {
++        if (str.has_value()) {
++            return std::optional<String16>(toString16(str.value()));
++        }
++
++        return std::nullopt;
++    }
++
++    inline std::string toStdString(const String8 &str) {
++        return std::string(str.c_str());
++    }
++
++    inline std::string toStdString(const String16 &str) {
++        String8 str8(str);
++        return std::string(str8.c_str());
++    }
++
++    /**
++     * Convert a non-null-terminated UTF16 string to a UTF8 string (i.e. in jni functions)
++     * len is the number of characters.
++     */
++    inline std::string toStdString(const char16_t *str, size_t len) {
++        String16 str16(str, len);
++        String8 str8(str16);
++        return std::string(str8.c_str());
++    }
++} // namespace android
++
++#endif // ANDROID_SERVERS_CAMERA_STRINGUTILS_H
+diff --git a/camera/camera/VendorTagDescriptor.h b/camera/camera/VendorTagDescriptor.h
+new file mode 100644
+index 0000000..b3440d5
+--- /dev/null
++++ b/camera/camera/VendorTagDescriptor.h
+@@ -0,0 +1,263 @@
++/*
++ * Copyright (C) 2014 The Android Open Source Project
++ *
++ * Licensed under the Apache License, Version 2.0 (the "License");
++ * you may not use this file except in compliance with the License.
++ * You may obtain a copy of the License at
++ *
++ *      http://www.apache.org/licenses/LICENSE-2.0
++ *
++ * Unless required by applicable law or agreed to in writing, software
++ * distributed under the License is distributed on an "AS IS" BASIS,
++ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++ * See the License for the specific language governing permissions and
++ * limitations under the License.
++ */
++
++#ifndef VENDOR_TAG_DESCRIPTOR_H
++
++#include <binder/Parcelable.h>
++#include <utils/Vector.h>
++#include <utils/KeyedVector.h>
++#include <utils/String8.h>
++#include <utils/RefBase.h>
++#include <system/camera_vendor_tags.h>
++#include <unordered_map>
++#include <stdint.h>
++
++namespace android {
++
++class VendorTagDescriptor;
++
++namespace hardware {
++namespace camera2 {
++namespace params {
++
++/**
++ * VendorTagDescriptor objects are parcelable containers for the vendor tag
++ * definitions provided, and are typically used to pass the vendor tag
++ * information enumerated by the HAL to clients of the camera service.
++ */
++class VendorTagDescriptor : public Parcelable {
++    public:
++        virtual ~VendorTagDescriptor();
++
++        VendorTagDescriptor();
++        VendorTagDescriptor(const VendorTagDescriptor& src);
++        VendorTagDescriptor& operator=(const VendorTagDescriptor& rhs);
++
++        void copyFrom(const VendorTagDescriptor& src);
++
++        /**
++         * The following 'get*' methods implement the corresponding
++         * functions defined in
++         * system/media/camera/include/system/camera_vendor_tags.h
++         */
++
++        // Returns the number of vendor tags defined.
++        int getTagCount() const;
++
++        // Returns an array containing the id's of vendor tags defined.
++        void getTagArray(uint32_t* tagArray) const;
++
++        // Returns the section name string for a given vendor tag id.
++        const char* getSectionName(uint32_t tag) const;
++
++        // Returns the tag name string for a given vendor tag id.
++        const char* getTagName(uint32_t tag) const;
++
++        // Returns the tag type for a given vendor tag id.
++        int getTagType(uint32_t tag) const;
++
++        /**
++         * Write the VendorTagDescriptor object into the given parcel.
++         *
++         * Returns OK on success, or a negative error code.
++         */
++        virtual status_t writeToParcel(
++                /*out*/
++                android::Parcel* parcel) const override;
++
++        /**
++         * Convenience method to get a vector containing all vendor tag
++         * sections, or an empty vector if none are defined.
++         * The pointer is valid for the lifetime of the VendorTagDescriptor,
++         * or until readParcel or copyFrom is invoked.
++         */
++        const SortedVector<String8>* getAllSectionNames() const;
++
++        /**
++         * Lookup the tag id for a given tag name and section.
++         *
++         * Returns OK on success, or a negative error code.
++         */
++        status_t lookupTag(const String8& name, const String8& section, /*out*/uint32_t* tag) const;
++
++        /**
++         * Dump the currently configured vendor tags to a file descriptor.
++         */
++        void dump(int fd, int verbosity, int indentation) const;
++
++        /**
++         * Get Section for corresponding tag.
++         */
++        ssize_t getSectionIndex(uint32_t tag) const;
++
++        /**
++         * Read values VendorTagDescriptor object from the given parcel.
++         *
++         * Returns OK on success, or a negative error code.
++         */
++        virtual status_t readFromParcel(const android::Parcel* parcel) override;
++
++    protected:
++        KeyedVector<String8, KeyedVector<String8, uint32_t>*> mReverseMapping;
++        KeyedVector<uint32_t, String8> mTagToNameMap;
++        KeyedVector<uint32_t, uint32_t> mTagToSectionMap; // Value is offset in mSections
++        KeyedVector<uint32_t, int32_t> mTagToTypeMap;
++        SortedVector<String8> mSections;
++        // must be int32_t to be compatible with Parcel::writeInt32
++        int32_t mTagCount;
++
++        vendor_tag_ops mVendorOps;
++};
++} /* namespace params */
++} /* namespace camera2 */
++} /* namespace hardware */
++
++/**
++ * This version of VendorTagDescriptor must be stored in Android sp<>, and adds support for using it
++ * as a global tag descriptor.
++ *
++ * It's a child class of the basic hardware::camera2::params::VendorTagDescriptor since basic
++ * Parcelable objects cannot require being kept in an sp<> and still work with auto-generated AIDL
++ * interface implementations.
++ */
++class VendorTagDescriptor :
++            public ::android::hardware::camera2::params::VendorTagDescriptor,
++            public LightRefBase<VendorTagDescriptor> {
++
++  public:
++
++    /**
++     * Create a VendorTagDescriptor object from the given vendor_tag_ops_t
++     * struct.
++     *
++     * Returns OK on success, or a negative error code.
++     */
++    static status_t createDescriptorFromOps(const vendor_tag_ops_t* vOps,
++            /*out*/
++            sp<VendorTagDescriptor>& descriptor);
++
++    /**
++     * Sets the global vendor tag descriptor to use for this process.
++     * Camera metadata operations that access vendor tags will use the
++     * vendor tag definitions set this way.
++     *
++     * Returns OK on success, or a negative error code.
++     */
++    static status_t setAsGlobalVendorTagDescriptor(const sp<VendorTagDescriptor>& desc);
++
++    /**
++     * Returns the global vendor tag descriptor used by this process.
++     * This will contain NULL if no vendor tags are defined.
++     */
++    static sp<VendorTagDescriptor> getGlobalVendorTagDescriptor();
++
++    /**
++     * Clears the global vendor tag descriptor used by this process.
++     */
++    static void clearGlobalVendorTagDescriptor();
++
++};
++
++namespace hardware {
++namespace camera2 {
++namespace params {
++
++class VendorTagDescriptorCache : public Parcelable {
++  public:
++
++    VendorTagDescriptorCache() {};
++
++    int32_t addVendorDescriptor(metadata_vendor_id_t id,
++            sp<android::VendorTagDescriptor> desc);
++
++    int32_t getVendorTagDescriptor(
++            metadata_vendor_id_t id,
++            sp<android::VendorTagDescriptor> *desc /*out*/);
++
++    // Parcelable interface
++    status_t writeToParcel(android::Parcel* parcel) const override;
++    status_t readFromParcel(const android::Parcel* parcel) override;
++
++    // Returns the number of vendor tags defined.
++    int getTagCount(metadata_vendor_id_t id) const;
++
++    // Returns an array containing the id's of vendor tags defined.
++    void getTagArray(uint32_t* tagArray, metadata_vendor_id_t id) const;
++
++    // Returns the section name string for a given vendor tag id.
++    const char* getSectionName(uint32_t tag, metadata_vendor_id_t id) const;
++
++    // Returns the tag name string for a given vendor tag id.
++    const char* getTagName(uint32_t tag, metadata_vendor_id_t id) const;
++
++    // Returns the tag type for a given vendor tag id.
++    int getTagType(uint32_t tag, metadata_vendor_id_t id) const;
++
++    /**
++     * Dump the currently configured vendor tags to a file descriptor.
++     */
++    void dump(int fd, int verbosity, int indentation) const;
++
++    const std::unordered_map<metadata_vendor_id_t, sp<android::VendorTagDescriptor>> &
++            getVendorIdsAndTagDescriptors();
++
++  protected:
++    std::unordered_map<metadata_vendor_id_t, sp<android::VendorTagDescriptor>> mVendorMap;
++    struct vendor_tag_cache_ops mVendorCacheOps;
++};
++
++} /* namespace params */
++} /* namespace camera2 */
++} /* namespace hardware */
++
++class VendorTagDescriptorCache :
++        public ::android::hardware::camera2::params::VendorTagDescriptorCache,
++        public LightRefBase<VendorTagDescriptorCache> {
++  public:
++
++    /**
++     * Sets the global vendor tag descriptor cache to use for this process.
++     * Camera metadata operations that access vendor tags will use the
++     * vendor tag definitions set this way.
++     *
++     * Returns OK on success, or a negative error code.
++     */
++    static status_t setAsGlobalVendorTagCache(
++            const sp<VendorTagDescriptorCache>& cache);
++
++    /**
++     * Returns the global vendor tag cache used by this process.
++     * This will contain NULL if no vendor tags are defined.
++     */
++    static sp<VendorTagDescriptorCache> getGlobalVendorTagCache();
++
++    /**
++     * Clears the global vendor tag cache used by this process.
++     */
++    static void clearGlobalVendorTagCache();
++
++    /**
++     * Return true if given vendor id is present in the vendor tag caches, return
++     * false otherwise.
++     */
++    static bool isVendorCachePresent(metadata_vendor_id_t vendorId);
++
++};
++
++} /* namespace android */
++
++#define VENDOR_TAG_DESCRIPTOR_H
++#endif /* VENDOR_TAG_DESCRIPTOR_H */
+diff --git a/camera/camera/android/hardware/ICamera.h b/camera/camera/android/hardware/ICamera.h
+new file mode 100644
+index 0000000..3c1670a
+--- /dev/null
++++ b/camera/camera/android/hardware/ICamera.h
+@@ -0,0 +1,168 @@
++/*
++ * Copyright (C) 2008 The Android Open Source Project
++ *
++ * Licensed under the Apache License, Version 2.0 (the "License");
++ * you may not use this file except in compliance with the License.
++ * You may obtain a copy of the License at
++ *
++ *      http://www.apache.org/licenses/LICENSE-2.0
++ *
++ * Unless required by applicable law or agreed to in writing, software
++ * distributed under the License is distributed on an "AS IS" BASIS,
++ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++ * See the License for the specific language governing permissions and
++ * limitations under the License.
++ */
++
++#ifndef ANDROID_HARDWARE_ICAMERA_H
++#define ANDROID_HARDWARE_ICAMERA_H
++
++#include <utils/RefBase.h>
++#include <binder/IInterface.h>
++#include <binder/Parcel.h>
++#include <binder/IMemory.h>
++#include <binder/Status.h>
++#include <gui/Flags.h>
++#include <utils/String8.h>
++
++namespace android {
++
++class IGraphicBufferProducer;
++class Surface;
++
++namespace hardware {
++
++class ICameraClient;
++
++#if WB_LIBCAMERASERVICE_WITH_DEPENDENCIES
++typedef Surface ProducerType;
++#else
++typedef IGraphicBufferProducer ProducerType;
++#endif
++
++class ICamera : public android::IInterface {
++    /**
++     * Keep up-to-date with ICamera.aidl in frameworks/base
++     */
++public:
++    enum {
++        // Pass real YUV data in video buffers through ICameraClient.dataCallbackTimestamp().
++        VIDEO_BUFFER_MODE_DATA_CALLBACK_YUV = 0,
++        // Pass metadata in video buffers through ICameraClient.dataCallbackTimestamp().
++        VIDEO_BUFFER_MODE_DATA_CALLBACK_METADATA = 1,
++        // Pass video buffers through IGraphicBufferProducer set with setVideoTarget().
++        VIDEO_BUFFER_MODE_BUFFER_QUEUE = 2,
++    };
++
++    DECLARE_META_INTERFACE(Camera);
++
++    virtual binder::Status  disconnect() = 0;
++
++    // connect new client with existing camera remote
++    virtual status_t        connect(const sp<ICameraClient>& client) = 0;
++
++    // prevent other processes from using this ICamera interface
++    virtual status_t        lock() = 0;
++
++    // allow other processes to use this ICamera interface
++    virtual status_t        unlock() = 0;
++
++    // pass the SurfaceType to the camera service
++    virtual status_t        setPreviewTarget(const sp<SurfaceType>& bufferProducer) = 0;
++
++    // set the preview callback flag to affect how the received frames from
++    // preview are handled. Enabling preview callback flags disables any active
++    // preview callback surface set by setPreviewCallbackTarget().
++    virtual void            setPreviewCallbackFlag(int flag) = 0;
++    // set a buffer interface to use for client-received preview frames instead
++    // of preview callback buffers. Passing a valid interface here disables any
++    // active preview callbacks set by setPreviewCallbackFlag(). Passing NULL
++    // disables the use of the callback target.
++    virtual status_t        setPreviewCallbackTarget(const sp<SurfaceType>& callbackProducer) = 0;
++
++    // start preview mode, must call setPreviewTarget first
++    virtual status_t        startPreview() = 0;
++
++    // stop preview mode
++    virtual void            stopPreview() = 0;
++
++    // get preview state
++    virtual bool            previewEnabled() = 0;
++
++    // start recording mode
++    virtual status_t        startRecording() = 0;
++
++    // stop recording mode
++    virtual void            stopRecording() = 0;
++
++    // get recording state
++    virtual bool            recordingEnabled() = 0;
++
++    // Release a recording frame that was received via ICameraClient::dataCallbackTimestamp.
++    virtual void            releaseRecordingFrame(const sp<IMemory>& mem) = 0;
++
++    // Release a recording frame handle that was received via
++    // ICameraClient::recordingFrameHandleCallbackTimestamp.
++    virtual void            releaseRecordingFrameHandle(native_handle_t *handle) = 0;
++
++    // Release a batch of recording frame handles that was received via
++    // ICameraClient::recordingFrameHandleCallbackTimestampBatch
++    virtual void            releaseRecordingFrameHandleBatch(
++            const std::vector<native_handle_t*>& handles) = 0;
++
++    // auto focus
++    virtual status_t        autoFocus() = 0;
++
++    // cancel auto focus
++    virtual status_t        cancelAutoFocus() = 0;
++
++    /*
++     * take a picture.
++     * @param msgType the message type an application selectively turn on/off
++     * on a photo-by-photo basis. The supported message types are:
++     * CAMERA_MSG_SHUTTER, CAMERA_MSG_RAW_IMAGE, CAMERA_MSG_COMPRESSED_IMAGE,
++     * and CAMERA_MSG_POSTVIEW_FRAME. Any other message types will be ignored.
++     */
++    virtual status_t        takePicture(int msgType) = 0;
++
++    // set preview/capture parameters - key/value pairs
++    virtual status_t        setParameters(const String8& params) = 0;
++
++    // get preview/capture parameters - key/value pairs
++    virtual String8         getParameters() const = 0;
++
++    // send command to camera driver
++    virtual status_t        sendCommand(int32_t cmd, int32_t arg1, int32_t arg2) = 0;
++
++
++    // Tell camera how to pass video buffers. videoBufferMode is one of VIDEO_BUFFER_MODE_*.
++    // Returns OK if the specified video buffer mode is supported. If videoBufferMode is
++    // VIDEO_BUFFER_MODE_BUFFER_QUEUE, setVideoTarget() must be called before starting video
++    // recording.
++    virtual status_t        setVideoBufferMode(int32_t videoBufferMode) = 0;
++
++    // Set the video buffer producer for camera to use in VIDEO_BUFFER_MODE_BUFFER_QUEUE mode.
++    virtual status_t        setVideoTarget(const sp<SurfaceType>& bufferProducer) = 0;
++
++    // Set the audio restriction mode
++    virtual status_t        setAudioRestriction(int32_t mode) = 0;
++
++    // Get the global audio restriction mode
++    virtual int32_t         getGlobalAudioRestriction() = 0;
++};
++
++// ----------------------------------------------------------------------------
++
++class BnCamera: public android::BnInterface<ICamera>
++{
++public:
++    virtual status_t    onTransact( uint32_t code,
++                                    const Parcel& data,
++                                    Parcel* reply,
++                                    uint32_t flags = 0);
++};
++
++} // namespace hardware
++} // namespace android
++
++#endif
+diff --git a/camera/camera/android/hardware/ICameraClient.h b/camera/camera/android/hardware/ICameraClient.h
+new file mode 100644
+index 0000000..8e46d17
+--- /dev/null
++++ b/camera/camera/android/hardware/ICameraClient.h
+@@ -0,0 +1,67 @@
++/*
++ * Copyright (C) 2008 The Android Open Source Project
++ *
++ * Licensed under the Apache License, Version 2.0 (the "License");
++ * you may not use this file except in compliance with the License.
++ * You may obtain a copy of the License at
++ *
++ *      http://www.apache.org/licenses/LICENSE-2.0
++ *
++ * Unless required by applicable law or agreed to in writing, software
++ * distributed under the License is distributed on an "AS IS" BASIS,
++ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++ * See the License for the specific language governing permissions and
++ * limitations under the License.
++ */
++
++#ifndef ANDROID_HARDWARE_ICAMERA_APP_H
++#define ANDROID_HARDWARE_ICAMERA_APP_H
++
++#include <utils/RefBase.h>
++#include <binder/IInterface.h>
++#include <binder/Parcel.h>
++#include <binder/IMemory.h>
++#include <utils/Timers.h>
++#include <system/camera.h>
++
++namespace android {
++namespace hardware {
++
++class ICameraClient: public android::IInterface
++{
++public:
++    DECLARE_META_INTERFACE(CameraClient);
++
++    virtual void            notifyCallback(int32_t msgType, int32_t ext1, int32_t ext2) = 0;
++    virtual void            dataCallback(int32_t msgType, const sp<IMemory>& data,
++                                         camera_frame_metadata_t *metadata) = 0;
++    virtual void            dataCallbackTimestamp(nsecs_t timestamp, int32_t msgType, const sp<IMemory>& data) = 0;
++
++    // Invoked to send a recording frame handle with a timestamp. Call
++    // ICamera::releaseRecordingFrameHandle to release the frame handle.
++    virtual void            recordingFrameHandleCallbackTimestamp(nsecs_t timestamp,
++                                         native_handle_t* handle) = 0;
++
++    // Invoked to send a batch of recording frame handles with timestamp. Call
++    // ICamera::releaseRecordingFrameHandleBatch to release the frame handles.
++    // Size of timestamps and handles must match
++    virtual void            recordingFrameHandleCallbackTimestampBatch(
++                                        const std::vector<nsecs_t>& timestamps,
++                                        const std::vector<native_handle_t*>& handles) = 0;
++};
++
++// ----------------------------------------------------------------------------
++
++class BnCameraClient: public android::BnInterface<ICameraClient>
++{
++public:
++    virtual status_t    onTransact( uint32_t code,
++                                    const Parcel& data,
++                                    Parcel* reply,
++                                    uint32_t flags = 0);
++};
++
++} // namespace hardware
++} // namespace android
++
++#endif
+diff --git a/camera/camera/camera2/CaptureRequest.h b/camera/camera/camera2/CaptureRequest.h
+new file mode 100644
+index 0000000..28dbc7c
+--- /dev/null
++++ b/camera/camera/camera2/CaptureRequest.h
+@@ -0,0 +1,89 @@
++/*
++ * Copyright (C) 2013 The Android Open Source Project
++ *
++ * Licensed under the Apache License, Version 2.0 (the "License");
++ * you may not use this file except in compliance with the License.
++ * You may obtain a copy of the License at
++ *
++ *      http://www.apache.org/licenses/LICENSE-2.0
++ *
++ * Unless required by applicable law or agreed to in writing, software
++ * distributed under the License is distributed on an "AS IS" BASIS,
++ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++ * See the License for the specific language governing permissions and
++ * limitations under the License.
++ */
++
++#ifndef ANDROID_HARDWARE_PHOTOGRAPHY_CAPTUREREQUEST_H
++#define ANDROID_HARDWARE_PHOTOGRAPHY_CAPTUREREQUEST_H
++
++#include <utils/RefBase.h>
++#include <utils/Vector.h>
++#include <binder/Parcelable.h>
++#include <camera/CameraMetadata.h>
++
++namespace android {
++
++class Surface;
++
++namespace hardware {
++namespace camera2 {
++
++struct CaptureRequest : public Parcelable {
++
++    // those are needed so we can use a forward declaration of Surface, otherwise
++    // the type is incomplete when the ctor/dtors are generated. This has the added
++    // benefit that ctor/dtors are not inlined, which is good because they're not trivial
++    // (because of the vtable and Vector<>)
++    CaptureRequest();
++    CaptureRequest(const CaptureRequest& rhs);
++    CaptureRequest(CaptureRequest&& rhs) noexcept;
++    virtual ~CaptureRequest();
++
++    struct PhysicalCameraSettings {
++        std::string id;
++        CameraMetadata settings;
++    };
++    std::vector<PhysicalCameraSettings> mPhysicalCameraSettings;
++
++    // Used by NDK client to pass surfaces by stream/surface index.
++    bool                    mSurfaceConverted = false;
++
++    // Starting in Android O, create a Surface from Parcel will take one extra
++    // IPC call.
++    Vector<sp<Surface> >    mSurfaceList;
++    // Optional way of passing surface list since passing Surface over binder
++    // is expensive. Use the stream/surface index from current output configuration
++    // to represent an configured output Surface. When stream/surface index is used,
++    // set mSurfaceList to zero length to save unparcel time.
++    Vector<int>             mStreamIdxList;
++    Vector<int>             mSurfaceIdxList; // per stream surface list index
++
++    bool                    mIsReprocess;
++
++    void*                   mContext; // arbitrary user context from NDK apps, null for java apps
++
++    std::string             mUserTag; // The string representation of object passed into setTag.
++
++    /**
++     * Keep impl up-to-date with CaptureRequest.java in frameworks/base
++     */
++    // used by cameraserver to receive CaptureRequest from java/NDK client
++    status_t                readFromParcel(const android::Parcel* parcel) override;
++    // used by NDK client to send CaptureRequest to cameraserver
++    status_t                writeToParcel(android::Parcel* parcel) const override;
++};
++
++} // namespace camera2
++} // namespace hardware
++
++struct CaptureRequest :
++        public RefBase, public hardware::camera2::CaptureRequest {
++  public:
++    // Same as android::hardware::camera2::CaptureRequest, except that you can
++    // put this in an sp<>
++};
++
++} // namespace android
++
++#endif
+diff --git a/camera/camera/camera2/ConcurrentCamera.h b/camera/camera/camera2/ConcurrentCamera.h
+new file mode 100644
+index 0000000..2a65da8
+--- /dev/null
++++ b/camera/camera/camera2/ConcurrentCamera.h
+@@ -0,0 +1,56 @@
++/*
++ * Copyright (C) 2020 The Android Open Source Project
++ *
++ * Licensed under the Apache License, Version 2.0 (the "License");
++ * you may not use this file except in compliance with the License.
++ * You may obtain a copy of the License at
++ *
++ *      http://www.apache.org/licenses/LICENSE-2.0
++ *
++ * Unless required by applicable law or agreed to in writing, software
++ * distributed under the License is distributed on an "AS IS" BASIS,
++ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++ * See the License for the specific language governing permissions and
++ * limitations under the License.
++ */
++
++#ifndef ANDROID_HARDWARE_CAMERA2_UTIL_CONCURRENTCAMERA_H
++#define ANDROID_HARDWARE_CAMERA2_UTIL_CONCURRENTCAMERA_H
++
++#include <binder/Parcel.h>
++#include <binder/Parcelable.h>
++#include <camera2/OutputConfiguration.h>
++#include <camera2/SessionConfiguration.h>
++
++namespace android {
++namespace hardware {
++namespace camera2 {
++namespace utils {
++
++struct ConcurrentCameraIdCombination : public Parcelable {
++    std::vector<std::pair<std::string, int32_t>> mConcurrentCameraIdDeviceIdPairs;
++    ConcurrentCameraIdCombination();
++    ConcurrentCameraIdCombination(std::vector<std::pair<std::string, int32_t>> &&combination);
++    virtual ~ConcurrentCameraIdCombination();
++
++    virtual status_t writeToParcel(android::Parcel *parcel) const override;
++    virtual status_t readFromParcel(const android::Parcel* parcel) override;
++};
++
++struct CameraIdAndSessionConfiguration : public Parcelable {
++    std::string mCameraId;
++    SessionConfiguration mSessionConfiguration;
++
++    CameraIdAndSessionConfiguration();
++    virtual ~CameraIdAndSessionConfiguration();
++
++    virtual status_t writeToParcel(android::Parcel *parcel) const override;
++    virtual status_t readFromParcel(const android::Parcel* parcel) override;
++};
++
++} // namespace utils
++} // namespace camera2
++} // namespace hardware
++} // namespace android
++
++#endif
+diff --git a/camera/camera/camera2/OutputConfiguration.h b/camera/camera/camera2/OutputConfiguration.h
+new file mode 100644
+index 0000000..f430014
+--- /dev/null
++++ b/camera/camera/camera2/OutputConfiguration.h
+@@ -0,0 +1,287 @@
++/*
++ * Copyright (C) 2015-2018 The Android Open Source Project
++ *
++ * Licensed under the Apache License, Version 2.0 (the "License");
++ * you may not use this file except in compliance with the License.
++ * You may obtain a copy of the License at
++ *
++ *      http://www.apache.org/licenses/LICENSE-2.0
++ *
++ * Unless required by applicable law or agreed to in writing, software
++ * distributed under the License is distributed on an "AS IS" BASIS,
++ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++ * See the License for the specific language governing permissions and
++ * limitations under the License.
++ */
++
++#ifndef ANDROID_HARDWARE_CAMERA2_OUTPUTCONFIGURATION_H
++#define ANDROID_HARDWARE_CAMERA2_OUTPUTCONFIGURATION_H
++
++#include <string>
++#include "system/graphics-base-v1.0.h"
++
++#include <gui/Flags.h>  // remove with WB_LIBCAMERASERVICE_WITH_DEPENDENCIES
++#if WB_LIBCAMERASERVICE_WITH_DEPENDENCIES
++#include <gui/view/Surface.h>
++#else
++#include <gui/IGraphicBufferProducer.h>
++#endif
++#include <binder/Parcelable.h>
++
++namespace android {
++
++class Surface;
++
++namespace hardware {
++namespace camera2 {
++namespace params {
++
++class OutputConfiguration : public android::Parcelable {
++public:
++
++    static const int ROTATION_0;
++    static const int INVALID_ROTATION;
++    static const int INVALID_SET_ID;
++    enum SurfaceType {
++        SURFACE_TYPE_UNKNOWN = -1,
++        SURFACE_TYPE_SURFACE_VIEW = 0,
++        SURFACE_TYPE_SURFACE_TEXTURE = 1,
++        SURFACE_TYPE_MEDIA_RECORDER = 2,
++        SURFACE_TYPE_MEDIA_CODEC = 3,
++        SURFACE_TYPE_IMAGE_READER = 4
++    };
++    enum TimestampBaseType {
++        TIMESTAMP_BASE_DEFAULT = 0,
++        TIMESTAMP_BASE_SENSOR = 1,
++        TIMESTAMP_BASE_MONOTONIC = 2,
++        TIMESTAMP_BASE_REALTIME = 3,
++        TIMESTAMP_BASE_CHOREOGRAPHER_SYNCED = 4,
++        TIMESTAMP_BASE_MAX = TIMESTAMP_BASE_CHOREOGRAPHER_SYNCED,
++    };
++    enum MirrorModeType {
++        MIRROR_MODE_AUTO = 0,
++        MIRROR_MODE_NONE = 1,
++        MIRROR_MODE_H = 2,
++        MIRROR_MODE_V = 3,
++    };
++
++    const std::vector<ParcelableSurfaceType>& getSurfaces() const;
++    int                        getRotation() const;
++    int                        getSurfaceSetID() const;
++    int                        getSurfaceType() const;
++    int                        getWidth() const;
++    int                        getHeight() const;
++    int64_t                    getDynamicRangeProfile() const;
++    int32_t                    getColorSpace() const;
++    bool                       isDeferred() const;
++    bool                       isShared() const;
++    std::string                getPhysicalCameraId() const;
++    bool                       isMultiResolution() const;
++    int64_t                    getStreamUseCase() const;
++    int                        getTimestampBase() const;
++    int                        getMirrorMode(ParcelableSurfaceType surface) const;
++    int                        getMirrorMode() const;
++    bool                       useReadoutTimestamp() const;
++    int                        getFormat() const;
++    int                        getDataspace() const;
++    int64_t                    getUsage() const;
++    bool                       isComplete() const;
++
++    // set of sensor pixel mode resolutions allowed {MAX_RESOLUTION, DEFAULT_MODE};
++    const std::vector<int32_t>&            getSensorPixelModesUsed() const;
++    /**
++     * Keep impl up-to-date with OutputConfiguration.java in frameworks/base
++     */
++    virtual status_t           writeToParcel(android::Parcel* parcel) const override;
++
++    virtual status_t           readFromParcel(const android::Parcel* parcel) override;
++
++    // getGraphicBufferProducer will be NULL
++    // getRotation will be INVALID_ROTATION
++    // getSurfaceSetID will be INVALID_SET_ID
++    OutputConfiguration();
++
++    // getGraphicBufferProducer will be NULL if error occurred
++    // getRotation will be INVALID_ROTATION if error occurred
++    // getSurfaceSetID will be INVALID_SET_ID if error occurred
++    OutputConfiguration(const android::Parcel& parcel);
++
++    OutputConfiguration(ParcelableSurfaceType& surface, int rotation,
++            const std::string& physicalCameraId,
++            int surfaceSetID = INVALID_SET_ID, bool isShared = false);
++
++    OutputConfiguration(const std::vector<ParcelableSurfaceType>& surfaces,
++                        int rotation, const std::string& physicalCameraId,
++                        int surfaceSetID = INVALID_SET_ID,
++                        int surfaceType = SURFACE_TYPE_UNKNOWN, int width = 0,
++                        int height = 0, bool isShared = false,
++                        int format = HAL_PIXEL_FORMAT_IMPLEMENTATION_DEFINED,
++                        int dataspace = 0);
++
++    OutputConfiguration(int surfaceType, int width, int height, int format, int32_t colorSpace,
++            int mirrorMode, bool useReadoutTimestamp,int timestampBase, int dataspace,
++            int64_t usage, int64_t streamusecase, std::string physicalCamId);
++
++    bool operator == (const OutputConfiguration& other) const {
++        return ( mRotation == other.mRotation &&
++                mSurfaceSetID == other.mSurfaceSetID &&
++                mSurfaceType == other.mSurfaceType &&
++                mWidth == other.mWidth &&
++                mHeight == other.mHeight &&
++                mIsDeferred == other.mIsDeferred &&
++                mIsShared == other.mIsShared &&
++                surfacesEqual(other) &&
++                mPhysicalCameraId == other.mPhysicalCameraId &&
++                mIsMultiResolution == other.mIsMultiResolution &&
++                sensorPixelModesUsedEqual(other) &&
++                mDynamicRangeProfile == other.mDynamicRangeProfile &&
++                mColorSpace == other.mColorSpace &&
++                mStreamUseCase == other.mStreamUseCase &&
++                mTimestampBase == other.mTimestampBase &&
++                mMirrorMode == other.mMirrorMode &&
++                mirrorModesEqual(other) &&
++                mUseReadoutTimestamp == other.mUseReadoutTimestamp &&
++                mFormat == other.mFormat &&
++                mDataspace == other.mDataspace &&
++                mUsage == other.mUsage);
++    }
++    bool operator != (const OutputConfiguration& other) const {
++        return !(*this == other);
++    }
++    bool operator < (const OutputConfiguration& other) const {
++        if (*this == other) return false;
++        if (mSurfaceSetID != other.mSurfaceSetID) {
++            return mSurfaceSetID < other.mSurfaceSetID;
++        }
++        if (mSurfaceType != other.mSurfaceType) {
++            return mSurfaceType < other.mSurfaceType;
++        }
++        if (mWidth != other.mWidth) {
++            return mWidth < other.mWidth;
++        }
++        if (mHeight != other.mHeight) {
++            return mHeight < other.mHeight;
++        }
++        if (mRotation != other.mRotation) {
++            return mRotation < other.mRotation;
++        }
++        if (mIsDeferred != other.mIsDeferred) {
++            return mIsDeferred < other.mIsDeferred;
++        }
++        if (mIsShared != other.mIsShared) {
++            return mIsShared < other.mIsShared;
++        }
++        if (mPhysicalCameraId != other.mPhysicalCameraId) {
++            return mPhysicalCameraId < other.mPhysicalCameraId;
++        }
++        if (mIsMultiResolution != other.mIsMultiResolution) {
++            return mIsMultiResolution < other.mIsMultiResolution;
++        }
++        if (!sensorPixelModesUsedEqual(other)) {
++            return sensorPixelModesUsedLessThan(other);
++        }
++        if (mDynamicRangeProfile != other.mDynamicRangeProfile) {
++            return mDynamicRangeProfile < other.mDynamicRangeProfile;
++        }
++        if (mColorSpace != other.mColorSpace) {
++            return mColorSpace < other.mColorSpace;
++        }
++        if (mStreamUseCase != other.mStreamUseCase) {
++            return mStreamUseCase < other.mStreamUseCase;
++        }
++        if (mTimestampBase != other.mTimestampBase) {
++            return mTimestampBase < other.mTimestampBase;
++        }
++        if (mMirrorMode != other.mMirrorMode) {
++            return mMirrorMode < other.mMirrorMode;
++        }
++        if (!mirrorModesEqual(other)) {
++            return mirrorModesLessThan(other);
++        }
++        if (mUseReadoutTimestamp != other.mUseReadoutTimestamp) {
++            return mUseReadoutTimestamp < other.mUseReadoutTimestamp;
++        }
++        if (mFormat != other.mFormat) {
++            return mFormat < other.mFormat;
++        }
++        if (mDataspace != other.mDataspace) {
++            return mDataspace < other.mDataspace;
++        }
++        if (mUsage != other.mUsage) {
++            return mUsage < other.mUsage;
++        }
++        return surfacesLessThan(other);
++    }
++
++    bool operator > (const OutputConfiguration& other) const {
++        return (*this != other && !(*this < other));
++    }
++
++    bool surfacesEqual(const OutputConfiguration& other) const;
++    bool sensorPixelModesUsedEqual(const OutputConfiguration& other) const;
++    bool sensorPixelModesUsedLessThan(const OutputConfiguration& other) const;
++    bool surfacesLessThan(const OutputConfiguration& other) const;
++    void addSurface(ParcelableSurfaceType surface) { mSurfaces.push_back(surface); }
++#if not WB_LIBCAMERASERVICE_WITH_DEPENDENCIES
++    void addGraphicProducer(sp<IGraphicBufferProducer> gbp) {addSurface(gbp);}
++#endif
++    bool mirrorModesEqual(const OutputConfiguration& other) const;
++    bool mirrorModesLessThan(const OutputConfiguration& other) const;
++    const std::vector<int32_t>& getMirrorModes() const {return mMirrorModeForProducers;}
++    bool sharedConfigEqual(const OutputConfiguration& other) const {
++        return (mRotation == other.mRotation &&
++                mSurfaceSetID == other.mSurfaceSetID &&
++                mSurfaceType == other.mSurfaceType &&
++                mWidth == other.mWidth &&
++                mHeight == other.mHeight &&
++                mIsDeferred == other.mIsDeferred &&
++                mIsShared == other.mIsShared &&
++                mPhysicalCameraId == other.mPhysicalCameraId &&
++                mIsMultiResolution == other.mIsMultiResolution &&
++                sensorPixelModesUsedEqual(other) &&
++                mDynamicRangeProfile == other.mDynamicRangeProfile &&
++                mColorSpace == other.mColorSpace &&
++                mStreamUseCase == other.mStreamUseCase &&
++                mTimestampBase == other.mTimestampBase &&
++                mMirrorMode == other.mMirrorMode &&
++                mUseReadoutTimestamp == other.mUseReadoutTimestamp &&
++                mFormat == other.mFormat &&
++                mDataspace == other.mDataspace &&
++                mUsage == other.mUsage);
++    }
++
++private:
++
++    void inferSurfaceProperties();
++    std::vector<ParcelableSurfaceType>  mSurfaces;
++    int                        mRotation;
++    int                        mSurfaceSetID;
++    int                        mSurfaceType;
++    int                        mWidth;
++    int                        mHeight;
++    bool                       mIsDeferred;
++    bool                       mIsShared;
++    std::string                mPhysicalCameraId;
++    bool                       mIsMultiResolution;
++    std::vector<int32_t>       mSensorPixelModesUsed;
++    int64_t                    mDynamicRangeProfile;
++    int32_t                    mColorSpace;
++    int64_t                    mStreamUseCase;
++    int                        mTimestampBase;
++    int                        mMirrorMode;
++    std::vector<int>           mMirrorModeForProducers; // 1:1 mapped with mGbps
++    bool                       mUseReadoutTimestamp;
++    int                        mFormat;
++    int                        mDataspace;
++    int64_t                    mUsage;
++};
++} // namespace params
++} // namespace camera2
++} // namespace hardware
++
++
++using hardware::camera2::params::OutputConfiguration;
++
++}; // namespace android
++
++#endif
+diff --git a/camera/camera/camera2/SessionConfiguration.h b/camera/camera/camera2/SessionConfiguration.h
+new file mode 100644
+index 0000000..22f8083
+--- /dev/null
++++ b/camera/camera/camera2/SessionConfiguration.h
+@@ -0,0 +1,128 @@
++/*
++ * Copyright (C) 2018 The Android Open Source Project
++ *
++ * Licensed under the Apache License, Version 2.0 (the "License");
++ * you may not use this file except in compliance with the License.
++ * You may obtain a copy of the License at
++ *
++ *      http://www.apache.org/licenses/LICENSE-2.0
++ *
++ * Unless required by applicable law or agreed to in writing, software
++ * distributed under the License is distributed on an "AS IS" BASIS,
++ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++ * See the License for the specific language governing permissions and
++ * limitations under the License.
++ */
++
++#ifndef ANDROID_HARDWARE_CAMERA2_SESSIONCONFIGURATION_H
++#define ANDROID_HARDWARE_CAMERA2_SESSIONCONFIGURATION_H
++
++#include "OutputConfiguration.h"
++
++#include <binder/Parcelable.h>
++#include <camera/CameraMetadata.h>
++
++namespace android {
++
++namespace hardware {
++namespace camera2 {
++namespace params {
++
++class SessionConfiguration : public android::Parcelable {
++public:
++
++    const std::vector<OutputConfiguration>& getOutputConfigurations() const {
++        return mOutputStreams;
++    }
++
++    int getInputWidth() const { return mInputWidth; }
++    int getInputHeight() const { return mInputHeight; }
++    int getInputFormat() const { return mInputFormat; }
++    int getOperatingMode() const { return mOperatingMode; }
++    bool inputIsMultiResolution() const { return mInputIsMultiResolution; }
++    bool hasSessionParameters() const { return mHasSessionParameters; }
++    const CameraMetadata& getSessionParameters() const { return mSessionParameters; }
++
++    virtual status_t writeToParcel(android::Parcel* parcel) const override;
++    virtual status_t readFromParcel(const android::Parcel* parcel) override;
++
++    SessionConfiguration() :
++            mInputWidth(0),
++            mInputHeight(0),
++            mInputFormat(-1),
++            mOperatingMode(-1) {}
++
++    SessionConfiguration(const android::Parcel& parcel) {
++        readFromParcel(&parcel);
++    }
++
++    SessionConfiguration(int inputWidth, int inputHeight, int inputFormat, int operatingMode) :
++        mInputWidth(inputWidth), mInputHeight(inputHeight), mInputFormat(inputFormat),
++        mOperatingMode(operatingMode) {}
++
++    bool operator == (const SessionConfiguration& other) const {
++        return (outputsEqual(other) &&
++                mInputWidth == other.mInputWidth &&
++                mInputHeight == other.mInputHeight &&
++                mInputFormat == other.mInputFormat &&
++                mOperatingMode == other.mOperatingMode &&
++                mInputIsMultiResolution == other.mInputIsMultiResolution);
++    }
++
++    bool operator != (const SessionConfiguration& other) const {
++        return !(*this == other);
++    }
++
++    bool operator < (const SessionConfiguration& other) const {
++        if (*this == other) return false;
++
++        if (mInputWidth != other.mInputWidth) {
++            return mInputWidth < other.mInputWidth;
++        }
++
++        if (mInputHeight != other.mInputHeight) {
++            return mInputHeight < other.mInputHeight;
++        }
++
++        if (mInputFormat != other.mInputFormat) {
++            return mInputFormat < other.mInputFormat;
++        }
++
++        if (mInputIsMultiResolution != other.mInputIsMultiResolution) {
++            return mInputIsMultiResolution < other.mInputIsMultiResolution;
++        }
++
++        if (mOperatingMode != other.mOperatingMode) {
++            return mOperatingMode < other.mOperatingMode;
++        }
++
++        return outputsLessThan(other);
++    }
++
++    bool operator > (const SessionConfiguration& other) const {
++        return (*this != other && !(*this < other));
++    }
++
++    bool outputsEqual(const SessionConfiguration& other) const;
++    bool outputsLessThan(const SessionConfiguration& other) const;
++    void addOutputConfiguration(const OutputConfiguration &config) {
++        mOutputStreams.push_back(config);
++    }
++
++private:
++
++    std::vector<OutputConfiguration> mOutputStreams;
++    int                              mInputWidth, mInputHeight, mInputFormat, mOperatingMode;
++    bool                             mInputIsMultiResolution = false;
++    bool                             mHasSessionParameters = false;
++    CameraMetadata                   mSessionParameters;
++};
++} // namespace params
++} // namespace camera2
++} // namespace hardware
++
++using hardware::camera2::params::SessionConfiguration;
++
++}; // namespace android
++
++#endif
+diff --git a/camera/camera/camera2/SubmitInfo.h b/camera/camera/camera2/SubmitInfo.h
+new file mode 100644
+index 0000000..8f271c0
+--- /dev/null
++++ b/camera/camera/camera2/SubmitInfo.h
+@@ -0,0 +1,44 @@
++/*
++ * Copyright (C) 2015 The Android Open Source Project
++ *
++ * Licensed under the Apache License, Version 2.0 (the "License");
++ * you may not use this file except in compliance with the License.
++ * You may obtain a copy of the License at
++ *
++ *      http://www.apache.org/licenses/LICENSE-2.0
++ *
++ * Unless required by applicable law or agreed to in writing, software
++ * distributed under the License is distributed on an "AS IS" BASIS,
++ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++ * See the License for the specific language governing permissions and
++ * limitations under the License.
++ */
++
++#ifndef ANDROID_HARDWARE_CAMERA2_UTIL_SUBMITINFO_H
++#define ANDROID_HARDWARE_CAMERA2_UTIL_SUBMITINFO_H
++
++#include <binder/Parcel.h>
++#include <binder/Parcelable.h>
++
++namespace android {
++namespace hardware {
++namespace camera2 {
++namespace utils {
++
++struct SubmitInfo : public android::Parcelable {
++public:
++
++    int32_t mRequestId;
++    int64_t mLastFrameNumber;
++
++    virtual status_t writeToParcel(android::Parcel *parcel) const override;
++    virtual status_t readFromParcel(const android::Parcel* parcel) override;
++
++};
++
++} // namespace utils
++} // namespace camera2
++} // namespace hardware
++} // namespace android
++
++#endif
+diff --git a/libmedia/libmedia_compat.cpp b/libmedia/libmedia_compat.cpp
+new file mode 100644
+index 0000000..55727b7
+--- /dev/null
++++ b/libmedia/libmedia_compat.cpp
+@@ -0,0 +1,40 @@
++/*
++ * Copyright (C) 2026 The LineageOS Project
++ *
++ * Licensed under the Apache License, Version 2.0 (the "License");
++ * you may not use this file except in compliance with the License.
++ * You may obtain a copy of the License at
++ *
++ *      http://www.apache.org/licenses/LICENSE-2.0
++ *
++ * Unless required by applicable law or agreed to in writing, software
++ * distributed under the License is distributed on an "AS IS" BASIS,
++ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++ * See the License for the specific language governing permissions and
++ * limitations under the License.
++ */
++
++#include <utils/String8.h>
++#include <utils/Errors.h>
++
++namespace android {
++
++class AudioSystem {
++public:
++    static status_t setParameters(int ioHandle, const String8& keyValuePairs);
++    static String8 getParameters(int ioHandle, const String8& keys);
++    static void setErrorCallback(void (*cb)(int err));
++};
++
++status_t AudioSystem::setParameters(int, const String8&) {
++    return 0;
++}
++
++String8 AudioSystem::getParameters(int, const String8&) {
++    return String8("");
++}
++
++void AudioSystem::setErrorCallback(void (*)(int)) {
++}
++
++} // namespace android

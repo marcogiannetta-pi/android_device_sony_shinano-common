@@ -1,0 +1,44 @@
+diff --git a/PowerHintSession.cpp b/PowerHintSession.cpp
+index 0b04fee..31ddd30 100644
+--- a/PowerHintSession.cpp
++++ b/PowerHintSession.cpp
+@@ -6,7 +6,10 @@
+ #define LOG_TAG "QTI PowerHAL"
+ 
+ #include "PowerHintSession.h"
++#if __has_include(<aidl/vendor/qti/hardware/display/config/IDisplayConfig.h>)
+ #include <aidl/vendor/qti/hardware/display/config/IDisplayConfig.h>
++#define HAS_QTI_DISPLAY_CONFIG 1
++#endif
+ #include <android-base/logging.h>
+ #include <android/binder_manager.h>
+ #include <dlfcn.h>
+@@ -17,8 +20,10 @@
+ #include "performance.h"
+ #include "utils.h"
+ 
++#ifdef HAS_QTI_DISPLAY_CONFIG
+ using aidl::vendor::qti::hardware::display::config::DisplayType;
+ using aidl::vendor::qti::hardware::display::config::IDisplayConfig;
++#endif
+ 
+ #define VENDOR_FEEDBACK_WORKLOAD_TYPE 0x00001601
+ #define VENDOR_FEEDBACK_TOPAPP_NAME 0x00001611
+@@ -208,6 +213,7 @@ bool initTopAppInfo(std::string& topAppName) {
+ }
+ 
+ void initSupportedFps(std::vector<int32_t>& supportedFps) {
++#ifdef HAS_QTI_DISPLAY_CONFIG
+     ndk::SpAIBinder binder(AServiceManager_checkService(
+             "vendor.qti.hardware.display.config.IDisplayConfig/default"));
+     if (binder.get() == nullptr) {
+@@ -228,6 +234,9 @@ void initSupportedFps(std::vector<int32_t>& supportedFps) {
+     std::sort(supportedFps.begin(), supportedFps.end());
+     LOG(INFO) << "Supported display refresh rates: "
+               << printValues(supportedFps, static_cast<int>(supportedFps.size()));
++#else
++    (void)supportedFps;
++#endif
+ }
+ 
+ PowerHintSessionImpl::PowerHintSessionImpl(int32_t tgid, int32_t uid,

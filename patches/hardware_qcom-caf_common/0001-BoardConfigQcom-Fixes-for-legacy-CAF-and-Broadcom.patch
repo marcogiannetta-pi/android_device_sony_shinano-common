@@ -1,9 +1,9 @@
 diff --git a/BoardConfigQcom.mk b/BoardConfigQcom.mk
-index bea6391..02883a7 100644
+index 4f9a815..22ffc17 100644
 --- a/BoardConfigQcom.mk
 +++ b/BoardConfigQcom.mk
-@@ -403,7 +403,7 @@ ifneq ($(filter $(QSSI_SUPPORTED_PLATFORMS),$(TARGET_BOARD_PLATFORM)),)
-             vendor/qcom/opensource/display
+@@ -430,7 +430,7 @@ ifneq ($(filter $(QSSI_SUPPORTED_PLATFORMS),$(TARGET_BOARD_PLATFORM)),)
+         $(call soong_config_set,qtidisplay,libdisplayconfig_qti_namespace,$(QCOM_SOONG_NAMESPACE))
      endif
      $(call soong_config_set,qtidisplay,headers_namespace,vendor/qcom/opensource/commonsys-intf/display)
 -else
@@ -11,7 +11,7 @@ index bea6391..02883a7 100644
      $(call soong_config_set,qtidisplay,headers_namespace,$(QCOM_SOONG_NAMESPACE)/display)
  endif
  
-@@ -446,9 +446,10 @@ else
+@@ -473,9 +473,10 @@ else
  endif
  
  # Add wlan to PRODUCT_SOONG_NAMESPACES
@@ -26,7 +26,7 @@ index bea6391..02883a7 100644
  # Verified Boot
  BOARD_AVB_SYSTEM_ADD_HASHTREE_FOOTER_ARGS += --hash_algorithm sha256
 diff --git a/qcom_boards.mk b/qcom_boards.mk
-index 62ae73d..3f05dd2 100644
+index 9428096..fa4280c 100644
 --- a/qcom_boards.mk
 +++ b/qcom_boards.mk
 @@ -1,7 +1,8 @@

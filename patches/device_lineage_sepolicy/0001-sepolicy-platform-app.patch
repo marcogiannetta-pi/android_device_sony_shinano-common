@@ -1,10 +1,12 @@
 diff --git a/qcom/private/platform_app.te b/qcom/private/platform_app.te
-index 87bd5c6..72e2ff5 100644
+index 2c8e854..64c1a0e 100644
 --- a/qcom/private/platform_app.te
 +++ b/qcom/private/platform_app.te
-@@ -1 +1 @@
+@@ -1,2 +1,2 @@
 -hal_client_domain(platform_app, vendor_hal_soter)
+-hal_client_domain(platform_app_36, vendor_hal_soter)
 +# hal_client_domain(platform_app, vendor_hal_soter)
++# hal_client_domain(platform_app_36, vendor_hal_soter)
 diff --git a/qcom/sepolicy.mk b/qcom/sepolicy.mk
 index 0dcb833..7711150 100644
 --- a/qcom/sepolicy.mk

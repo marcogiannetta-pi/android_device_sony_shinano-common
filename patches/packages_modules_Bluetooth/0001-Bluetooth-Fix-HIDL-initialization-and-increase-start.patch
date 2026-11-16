@@ -1,8 +1,8 @@
 diff --git a/system/gd/hal/hci_backend_hidl.cc b/system/gd/hal/hci_backend_hidl.cc
-index 4873f8e..38cc0c8 100644
+index 96bc1a0..d77d107 100644
 --- a/system/gd/hal/hci_backend_hidl.cc
 +++ b/system/gd/hal/hci_backend_hidl.cc
-@@ -87,7 +87,7 @@ class HidlHci : public HciBackend {
+@@ -106,7 +106,7 @@ class HidlHci : public HciBackend {
  public:
    HidlHci(Handler* module_handler) {
      log::info("Trying to find a HIDL interface");
@@ -11,7 +11,7 @@ index 4873f8e..38cc0c8 100644
  
      auto get_service_alarm = new os::Alarm(&module_handler->thread());
      get_service_alarm->Schedule(
-@@ -100,14 +100,8 @@ public:
+@@ -119,14 +119,8 @@ public:
                                board_name.has_value() && board_name.value() == kCuttlefishBoard;
                        if (emulator) {
                          log::error("board_name: {}", board_name.value());
@@ -27,7 +27,7 @@ index 4873f8e..38cc0c8 100644
                                "Unable to get a Bluetooth service after {}ms, start "
                                "the HAL before starting "
                                "Bluetooth",
-@@ -116,11 +110,11 @@ public:
+@@ -135,11 +129,11 @@ public:
                      timeout_ms),
              std::chrono::milliseconds(timeout_ms));
  
@@ -41,16 +41,3 @@ index 4873f8e..38cc0c8 100644
      }
  
      get_service_alarm->Cancel();
-diff --git a/system/main/shim/stack.cc b/system/main/shim/stack.cc
-index e83b51e..7f406c1 100644
---- a/system/main/shim/stack.cc
-+++ b/system/main/shim/stack.cc
-@@ -399,7 +399,7 @@ void Stack::handle_shut_down(std::promise<void> promise) {
- std::chrono::milliseconds Stack::get_gd_stack_timeout_ms(bool is_start) {
-   auto gd_timeout = os::GetSystemPropertyUint32(
-           is_start ? "bluetooth.gd.start_timeout" : "bluetooth.gd.stop_timeout",
--          /* default_value = */ is_start ? 3000 : 5000);
-+          /* default_value = */ is_start ? 10000 : 5000);
-   return std::chrono::milliseconds(gd_timeout *
-                                    os::GetSystemPropertyUint32("ro.hw_timeout_multiplier",
-                                                                /* default_value = */ 1));

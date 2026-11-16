@@ -26,6 +26,7 @@ declare -A PATCH_MAP=(
     ["frameworks_opt_telephony"]="frameworks/opt/telephony"
     ["hardware_broadcom_fm"]="hardware/broadcom/fm"
     ["hardware_interfaces"]="hardware/interfaces"
+    ["hardware_libhardware"]="hardware/libhardware"
     ["hardware_lineage_compat"]="hardware/lineage/compat"
     ["hardware_qcom-caf_common"]="hardware/qcom-caf/common"
     ["hardware_qcom-caf_msm8974_audio"]="hardware/qcom-caf/msm8974/audio"
@@ -42,13 +43,13 @@ declare -A PATCH_MAP=(
     ["packages_modules_Permission"]="packages/modules/Permission"
     ["system_core"]="system/core"
     ["system_hwservicemanager"]="system/hwservicemanager"
-    ["system_libhidl"]="system/libhidl"
     ["system_libvintf"]="system/libvintf"
     ["system_media"]="system/media"
     ["system_netd"]="system/netd"
     ["system_sepolicy"]="system/sepolicy"
     ["system_vold"]="system/vold"
     ["vendor_lineage"]="vendor/lineage"
+    ["vendor_qcom_opensource_power"]="vendor/qcom/opensource/power"
 )
 
 for patch_dir in "${!PATCH_MAP[@]}"; do

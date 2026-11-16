@@ -1,22 +1,19 @@
 diff --git a/server/Controllers.cpp b/server/Controllers.cpp
-index 48d0c50..6f72922 100644
+index 8a2c3be..18fd04c 100644
 --- a/server/Controllers.cpp
 +++ b/server/Controllers.cpp
-@@ -323,10 +323,8 @@ void Controllers::init() {
-         gLog.error("Failed to initialize BandwidthController (%s)", strerror(-ret));
-         // A failure to init almost definitely means that iptables failed to load
-         // our static ruleset, which then basically means network accounting will not work.
--        // As such simply exit netd.  This may crash loop the system, but by failing
--        // to bootup we will trigger rollback and thus this offers us protection against
--        // a mainline update breaking things.
--        exit(1);
+@@ -335,7 +335,8 @@ void Controllers::init() {
+         // As such simply exit netd.  This may crash loop the system, but by failing
+         // to bootup we will trigger rollback and thus this offers us protection against
+         // a mainline update breaking things.
+-        exit(2);
 +        // On legacy kernel 3.4 do not exit!
-+        // exit(1);
++        // exit(2);
      }
      gLog.info("Enabling bandwidth control: %" PRId64 "us", s.getTimeAndResetUs());
  
 diff --git a/server/main.cpp b/server/main.cpp
-index d27fd76..20d2256 100644
+index be9a1d0..a7323b7 100644
 --- a/server/main.cpp
 +++ b/server/main.cpp
 @@ -23,6 +23,7 @@
@@ -44,29 +41,17 @@ index d27fd76..20d2256 100644
      // Workaround for secureVPN with VpnIsolation enabled, refer to b/159994981 for details.
      if (tag == TAG_SYSTEM_DNS) uid = AID_DNS;
      return libnetd_updatable_tagSocket(sockFd, tag, uid, AID_DNS);
-@@ -120,7 +130,17 @@ bool initDnsResolver() {
+@@ -122,6 +132,7 @@ bool initDnsResolver() {
  
- }  // namespace
- 
-+static void logNetd(const char* msg) {
-+    FILE* f = fopen("/cache/netd.log", "a");
-+    if (f) {
-+        fprintf(f, "%s\n", msg);
-+        fflush(f);
-+        fclose(f);
-+    }
-+}
-+
- int main() {
-+    logNetd("netd main started");
-     Stopwatch s;
-     gLog.info("netd starting");
- 
-@@ -134,84 +154,95 @@ int main() {
-         setCloseOnExec(sock);
+ int main(const int argc, const char* argv[]) {
+     if ((argc == 2) && !strcmp(argv[1], "oneshot")) {
++        if (!isKernelAtLeast4_9()) return 0;
+         setenv("NETD_ONESHOT", "1", 1);
+         return libnetd_updatable_init("/sys/fs/cgroup");
+     }
+@@ -140,16 +151,19 @@ int main(const int argc, const char* argv[]) {
      }
  
-+    logNetd("step 1: cgroup2 & bpf");
      std::string cg2_path;
 -    if (!CgroupGetControllerPath(CGROUPV2_HIERARCHY_NAME, &cg2_path)) {
 -        ALOGE("Failed to find cgroup v2 root %s", strerror(errno));
@@ -75,7 +60,6 @@ index d27fd76..20d2256 100644
 +    if (isKernelAtLeast4_9()) {
 +        if (!CgroupGetControllerPath(CGROUPV2_HIERARCHY_NAME, &cg2_path)) {
 +            ALOGE("Failed to find cgroup v2 root %s", strerror(errno));
-+            logNetd("CgroupGetControllerPath failed (ignored)");
 +        }
  
 -    if (libnetd_updatable_init(cg2_path.c_str())) {
@@ -83,43 +67,30 @@ index d27fd76..20d2256 100644
 -        exit(1);
 +        if (libnetd_updatable_init(cg2_path.c_str())) {
 +            ALOGE("libnetd_updatable_init failed (bpf unsupported on legacy kernel)");
-+            logNetd("libnetd_updatable_init failed (ignored)");
 +        } else {
 +            gLog.info("libnetd_updatable_init success");
-+            logNetd("libnetd_updatable_init success");
 +        }
 +    } else {
 +        ALOGI("Kernel < 4.9: skipping cgroup2 and libnetd_updatable_init");
-+        logNetd("Kernel < 4.9: skipping cgroup2 and libnetd_updatable_init");
      }
 -    gLog.info("libnetd_updatable_init success");
  
-+    logNetd("step 2: NetlinkManager");
      NetlinkManager *nm = NetlinkManager::Instance();
      if (nm == nullptr) {
-         ALOGE("Unable to create NetlinkManager");
-+        logNetd("Unable to create NetlinkManager -> exit");
-         exit(1);
-     };
-     gLog.info("NetlinkManager instanced");
- 
-+    logNetd("step 3: Controllers init");
-     gCtls = new android::net::Controllers();
+@@ -162,22 +176,21 @@ int main(const int argc, const char* argv[]) {
      gCtls->init();
  
-+    logNetd("step 4: nm->start()");
      if (nm->start()) {
-         ALOGE("Unable to start NetlinkManager (%s)", strerror(errno));
+-        ALOGE("Unable to start NetlinkManager (%s)", strerror(errno));
 -        exit(1);
-+        logNetd("Unable to start NetlinkManager (continuing anyway)");
++        ALOGE("Unable to start NetlinkManager (%s), continuing", strerror(errno));
      }
  
-+    logNetd("step 5: makeNFLogListener");
      std::unique_ptr<NFLogListener> logListener;
      {
          auto result = makeNFLogListener();
          if (!isOk(result)) {
-             ALOGE("Unable to create NFLogListener: %s", toString(result).c_str());
+-            ALOGE("Unable to create NFLogListener: %s", toString(result).c_str());
 -            exit(1);
 -        }
 -        logListener = std::move(result.value());
@@ -127,90 +98,65 @@ index d27fd76..20d2256 100644
 -        if (!isOk(status)) {
 -            gLog.error("Unable to init WakeupController: %s", toString(status).c_str());
 -            // We can still continue without wakeup packet logging.
-+            logNetd("makeNFLogListener failed (continuing anyway)");
++            ALOGE("Unable to create NFLogListener: %s, continuing", toString(result).c_str());
 +        } else {
 +            logListener = std::move(result.value());
 +            auto status = gCtls->wakeupCtrl.init(logListener.get());
 +            if (!isOk(status)) {
 +                gLog.error("Unable to init WakeupController: %s", toString(status).c_str());
++                // We can still continue without wakeup packet logging.
 +            }
          }
      }
  
--    // Set local DNS mode, to prevent bionic from proxying
--    // back to this service, recursively.
--    // TODO: Check if we could remove it since resolver cache no loger
--    // checks this environment variable after aosp/838050.
-+    logNetd("step 6: initDnsResolver");
+@@ -188,14 +201,12 @@ int main(const int argc, const char* argv[]) {
      setenv("ANDROID_DNS_MODE", "local", 1);
--    // Note that only call initDnsResolver after gCtls initializing.
+     // Note that only call initDnsResolver after gCtls initializing.
      if (!initDnsResolver()) {
-         ALOGE("Unable to init resolver");
+-        ALOGE("Unable to init resolver");
 -        exit(1);
-+        logNetd("initDnsResolver failed (continuing anyway)");
++        ALOGE("Unable to init resolver, continuing");
      }
  
-+    logNetd("step 7: FwmarkServer");
      FwmarkServer fwmarkServer(&gCtls->netCtrl, &gCtls->eventReporter);
      if (fwmarkServer.startListener()) {
-         ALOGE("Unable to start FwmarkServer (%s)", strerror(errno));
+-        ALOGE("Unable to start FwmarkServer (%s)", strerror(errno));
 -        exit(1);
-+        logNetd("Unable to start FwmarkServer (continuing anyway)");
++        ALOGE("Unable to start FwmarkServer (%s), continuing", strerror(errno));
      }
  
-+    logNetd("step 8: NetdNativeService");
      Stopwatch subTime;
-     status_t ret;
-     if ((ret = NetdNativeService::start()) != android::OK) {
-         ALOGE("Unable to start NetdNativeService: %d", ret);
-+        logNetd("Unable to start NetdNativeService -> exit");
-         exit(1);
-     }
+@@ -207,8 +218,7 @@ int main(const int argc, const char* argv[]) {
      gLog.info("Registering NetdNativeService: %" PRId64 "us", subTime.getTimeAndResetUs());
  
-+    logNetd("step 9: MDnsService");
      if ((ret = MDnsService::start()) != android::OK) {
-         ALOGE("Unable to start MDnsService: %d", ret);
+-        ALOGE("Unable to start MDnsService: %d", ret);
 -        exit(1);
-+        logNetd("Unable to start MDnsService (continuing anyway)");
++        ALOGE("Unable to start MDnsService: %d, continuing", ret);
      }
      gLog.info("Registering MDnsService: %" PRId64 "us", subTime.getTimeAndResetUs());
  
-+    logNetd("step 10: HAL and threadpool");
-     android::net::process::ScopedPidFile pidFile(PID_FILE_PATH);
- 
--    // Now that netd is ready to process commands, advertise service availability for HAL clients.
--    // Usage of this HAL is anticipated to be thin; one thread per HAL service should suffice,
--    // AIDL and HIDL.
-     android::hardware::configureRpcThreadpool(2, true /* callerWillJoin */);
-     IPCThreadState::self()->disableBackgroundScheduling(true);
- 
-@@ -226,11 +257,13 @@ int main() {
- 
-     gLog.info("Registering NetdHwService: %" PRId64 "us", subTime.getTimeAndResetUs());
-     gLog.info("Netd started in %" PRId64 "us", s.timeTakenUs());
-+    logNetd("netd running successfully, joining threadpool");
-     if (startedHidlService) {
-         IPCThreadState::self()->joinThreadPool();
-     }
-     aidlService.join();
-     gLog.info("netd exiting");
-+    logNetd("netd exiting");
- 
-     exit(0);
- }
 diff --git a/server/netd.rc b/server/netd.rc
-index d564c0e..e6ef486 100644
+index 38f7cd4..7bfe46c 100644
 --- a/server/netd.rc
 +++ b/server/netd.rc
-@@ -8,8 +8,8 @@ service netd /system/bin/netd
-     socket dnsproxyd stream 0660 root inet
-     socket mdns stream 0660 root system
-     socket fwmarkd stream 0660 root inet
+@@ -10,7 +10,7 @@ service netd1shot /system/bin/netd oneshot
+     updatable
+     # these two only apply to 'netd1shot'
+     oneshot
+-    reboot_on_failure reboot,netd1shot-fail
++    # reboot_on_failure reboot,netd1shot-fail
+ 
+ # Keep in sync with 'netd1shot' above.
+ service netd /system/bin/netd
+@@ -29,8 +29,8 @@ service netd /system/bin/netd
+     # Mark it as updatable so init won't start it until all APEX packages are ready.
+     updatable
+     # for obvious reasons 'onrestart' doesn't apply to netd1shot above
 -    onrestart restart zygote
 -    onrestart restart zygote_secondary
 +    # onrestart restart zygote
 +    # onrestart restart zygote_secondary
-     # b/121354779: netd itself is not updatable, but on startup it dlopen()s the resolver library
-     # from the DNS resolver APEX. Mark it as updatable so init won't start it until all APEX
-     # packages are ready.
+ 
+ # Moved from external/android-clat/vendor-464xlat.rc. Since
+ # clatd is modularized and shipped in apex, migrate the

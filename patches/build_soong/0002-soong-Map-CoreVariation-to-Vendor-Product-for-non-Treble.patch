@@ -1,0 +1,22 @@
+diff --git a/android/image.go b/android/image.go
+index 5ca2fe7..9acbeee 100644
+--- a/android/image.go
++++ b/android/image.go
+@@ -289,6 +289,17 @@ func (imageTransitionMutator) IncomingTransition(ctx IncomingTransitionContext,
+ 		}
+ 		return variations[0]
+ 	}
++	// On non-Treble devices where vendor/product reside inside system, the system filesystem
++	// requests CoreVariation for modules whose PartitionTag is "system". Map CoreVariation to
++	// VendorVariation or ProductVariation when CoreVariation is not available on the target.
++	if incomingVariation == CoreVariation && !InList(CoreVariation, variations) {
++		if ctx.DeviceConfig().VendorPath() != VendorVariation && InList(VendorVariation, variations) {
++			return VendorVariation
++		}
++		if ctx.DeviceConfig().ProductPath() != ProductVariation && InList(ProductVariation, variations) {
++			return ProductVariation
++		}
++	}
+ 	return incomingVariation
+ }
+ 

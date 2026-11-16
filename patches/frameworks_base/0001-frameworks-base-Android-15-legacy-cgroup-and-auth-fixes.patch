@@ -13,10 +13,10 @@ index b9293242e..da26f60ff 100644
          return getTextClassifier(type);
      }
 diff --git a/core/jni/android_os_Debug.cpp b/core/jni/android_os_Debug.cpp
-index 8cf9c6af2..372cfb2ac 100644
+index 20dc06c99..a3856bee5 100644
 --- a/core/jni/android_os_Debug.cpp
 +++ b/core/jni/android_os_Debug.cpp
-@@ -796,9 +796,13 @@ static jboolean android_os_Debug_isVmapStack(JNIEnv *env, jobject clazz)
+@@ -798,9 +798,13 @@ static jboolean android_os_Debug_isVmapStack(JNIEnv *env, jobject clazz)
      if (cfg_state == CONFIG_UNKNOWN) {
          std::map<std::string, std::string> configs;
          const status_t result = android::kernelconfigs::LoadKernelConfigs(&configs);
@@ -34,18 +34,18 @@ index 8cf9c6af2..372cfb2ac 100644
      return cfg_state == CONFIG_SET;
  }
 diff --git a/core/jni/com_android_internal_os_Zygote.cpp b/core/jni/com_android_internal_os_Zygote.cpp
-index a92c6c871..c13b90494 100644
+index 15a7ee4a0..a876dabdc 100644
 --- a/core/jni/com_android_internal_os_Zygote.cpp
 +++ b/core/jni/com_android_internal_os_Zygote.cpp
-@@ -73,6 +73,7 @@
+@@ -50,6 +50,7 @@
  #include <processgroup/sched_policy.h>
  #include <seccomp_policy.h>
  #include <selinux/android.h>
 +#include <selinux/selinux.h>
+ #include <signal.h>
  #include <stats_socket.h>
- #include <utils/String8.h>
- #include <utils/Trace.h>
-@@ -1969,10 +1970,8 @@ static void SpecializeCommon(JNIEnv* env, uid_t uid, gid_t gid, jintArray gids,
+ #include <stdio.h>
+@@ -1985,10 +1986,8 @@ static void SpecializeCommon(JNIEnv* env, uid_t uid, gid_t gid, jintArray gids,
      if (getuid() == 0) {
          const int rc = createProcessGroup(uid, getpid());
          if (rc != 0) {
@@ -57,8 +57,8 @@ index a92c6c871..c13b90494 100644
 +                  /* pid= */ 0, strerror(-rc));
          }
  
-         if (is_system_server && UsePerAppMemcg()) {
-@@ -2148,8 +2147,13 @@ static void SpecializeCommon(JNIEnv* env, uid_t uid, gid_t gid, jintArray gids,
+         if (is_system_server) {
+@@ -2172,8 +2171,13 @@ static void SpecializeCommon(JNIEnv* env, uid_t uid, gid_t gid, jintArray gids,
      const char* se_info_ptr = se_info.has_value() ? se_info.value().c_str() : nullptr;
  
      if (selinux_android_setcontext(uid, is_system_server, se_info_ptr, nice_name_ptr) == -1) {
@@ -73,8 +73,8 @@ index a92c6c871..c13b90494 100644
 +        }
      }
  
-     // Make it easier to debug audit logs by setting the main thread's name to the
-@@ -2173,7 +2177,11 @@ static void SpecializeCommon(JNIEnv* env, uid_t uid, gid_t gid, jintArray gids,
+     if ((runtime_flags & RuntimeFlags::AUDIT_OUTGOING_TRANSACTIONS) != 0) {
+@@ -2204,7 +2208,12 @@ static void SpecializeCommon(JNIEnv* env, uid_t uid, gid_t gid, jintArray gids,
          // TODO(b/117874058): Remove hardcoded label here.
          static const char* kSystemServerLabel = "u:r:system_server:s0";
          if (selinux_android_setcon(kSystemServerLabel) != 0) {
@@ -82,16 +82,17 @@ index a92c6c871..c13b90494 100644
 +            if (security_getenforce() > 0) {
 +                fail_fn(CREATE_ERROR("selinux_android_setcon(%s)", kSystemServerLabel));
 +            } else {
-+                ALOGW("selinux_android_setcon(%s) failed, ignoring in permissive mode", kSystemServerLabel);
++                ALOGW("selinux_android_setcon(%s) failed, ignoring in permissive mode",
++                      kSystemServerLabel);
 +            }
          }
      }
  
 diff --git a/core/jni/fd_utils.cpp b/core/jni/fd_utils.cpp
-index 74e44c760..23cf4f509 100644
+index f00813c49..717f4baae 100644
 --- a/core/jni/fd_utils.cpp
 +++ b/core/jni/fd_utils.cpp
-@@ -50,6 +50,7 @@ static const char* kPathAllowlist[] = {
+@@ -49,6 +49,7 @@ static const char* kPathAllowlist[] = {
          "/dev/dri/renderD129", // Fixes b/31172436
          "/dev/stune/foreground/tasks",
          "/dev/blkio/tasks",
@@ -100,10 +101,10 @@ index 74e44c760..23cf4f509 100644
          "/metadata/aconfig/maps/system.flag.map",
          "/metadata/aconfig/boot/system.val"
 diff --git a/core/res/AndroidManifest.xml b/core/res/AndroidManifest.xml
-index 769c3d311..3dce5ae86 100644
+index 721e53088..edb840d1b 100644
 --- a/core/res/AndroidManifest.xml
 +++ b/core/res/AndroidManifest.xml
-@@ -2558,8 +2558,7 @@
+@@ -2691,8 +2691,7 @@
          android:permissionGroup="android.permission-group.UNDEFINED"
          android:description="@string/permdesc_ranging"
          android:label="@string/permlab_ranging"
@@ -113,73 +114,8 @@ index 769c3d311..3dce5ae86 100644
  
      <!-- @SystemApi Allows an application to suspend other apps, which will prevent the
           user from using them until they are unsuspended.
-diff --git a/packages/CrashRecovery/services/platform/java/com/android/server/RescueParty.java b/packages/CrashRecovery/services/platform/java/com/android/server/RescueParty.java
-index 8251fb4c9..b52b2de07 100644
---- a/packages/CrashRecovery/services/platform/java/com/android/server/RescueParty.java
-+++ b/packages/CrashRecovery/services/platform/java/com/android/server/RescueParty.java
-@@ -172,39 +172,7 @@ public class RescueParty {
-     }
- 
-     private static boolean isDisabled() {
--        // Check if we're explicitly enabled for testing
--        if (SystemProperties.getBoolean(PROP_ENABLE_RESCUE, false)) {
--            return false;
--        }
--
--        // We're disabled if the DeviceConfig disable flag is set to true.
--        // This is in case that an emergency rollback of the feature is needed.
--        if (SystemProperties.getBoolean(PROP_DEVICE_CONFIG_DISABLE_FLAG, false)) {
--            Slog.v(TAG, "Disabled because of DeviceConfig flag");
--            return true;
--        }
--
--        // We're disabled on all engineering devices
--        if (Build.TYPE.equals("eng")) {
--            Slog.v(TAG, "Disabled because of eng build");
--            return true;
--        }
--
--        // We're disabled on userdebug devices connected over USB, since that's
--        // a decent signal that someone is actively trying to debug the device,
--        // or that it's in a lab environment.
--        if (Build.TYPE.equals("userdebug") && isUsbActive()) {
--            Slog.v(TAG, "Disabled because of active USB connection");
--            return true;
--        }
--
--        // One last-ditch check
--        if (SystemProperties.getBoolean(PROP_DISABLE_RESCUE, false)) {
--            Slog.v(TAG, "Disabled because of manual property");
--            return true;
--        }
--
--        return false;
-+        return true;
-     }
- 
-     /**
-@@ -633,7 +601,8 @@ public class RescueParty {
- 
-     private static void executeWarmReboot(Context context, int level,
-             @Nullable String failedPackage) {
--        if (Flags.deprecateFlagsAndSettingsResets()) {
-+        Slog.w(TAG, "Warm reboot requested by RescueParty, but disabled on this build");
-+        return;
-             if (shouldThrottleReboot()) {
-                 return;
-             }
-@@ -670,7 +639,8 @@ public class RescueParty {
- 
-     private static void executeFactoryReset(Context context, int level,
-             @Nullable String failedPackage) {
--        if (Flags.deprecateFlagsAndSettingsResets()) {
-+        Slog.w(TAG, "Factory reset requested by RescueParty, but disabled on this build");
-+        return;
-             if (shouldThrottleReboot()) {
-                 return;
-             }
 diff --git a/packages/SettingsLib/FooterPreference/res/values-v33/styles_preference_expressive.xml b/packages/SettingsLib/FooterPreference/res/values-v33/styles_preference_expressive.xml
-index 3dab2b014..c54b7cd56 100644
+index 3745ccb80..476acb96c 100644
 --- a/packages/SettingsLib/FooterPreference/res/values-v33/styles_preference_expressive.xml
 +++ b/packages/SettingsLib/FooterPreference/res/values-v33/styles_preference_expressive.xml
 @@ -17,6 +17,8 @@
@@ -201,10 +137,10 @@ index 3dab2b014..c54b7cd56 100644
  
      <style name="ExpressiveFooterPreferenceRootLayoutStyle">
 diff --git a/packages/SettingsLib/MenuPreference/res/layout/settingslib_expressive_preference_ordermenu.xml b/packages/SettingsLib/MenuPreference/res/layout/settingslib_expressive_preference_ordermenu.xml
-index 5f3e69e3b..4be29cb26 100644
+index 29fe18061..ab75116cd 100644
 --- a/packages/SettingsLib/MenuPreference/res/layout/settingslib_expressive_preference_ordermenu.xml
 +++ b/packages/SettingsLib/MenuPreference/res/layout/settingslib_expressive_preference_ordermenu.xml
-@@ -26,13 +26,24 @@
+@@ -25,7 +25,8 @@
      android:background="?android:attr/selectableItemBackground"
      android:clipToPadding="false"
      android:baselineAligned="false"
@@ -212,27 +148,8 @@ index 5f3e69e3b..4be29cb26 100644
 +    android:filterTouchesWhenObscured="false"
 +    android:theme="?expressivePreferenceTheme">
  
--    <include layout="@layout/settingslib_expressive_preference_number_frame"/>
-+    <include
-+        layout="@layout/settingslib_expressive_preference_number_frame"
-+        android:layout_width="wrap_content"
-+        android:layout_height="wrap_content"/>
- 
--    <include layout="@layout/settingslib_expressive_preference_icon_frame"/>
-+    <include
-+        layout="@layout/settingslib_expressive_preference_icon_frame"
-+        android:layout_width="wrap_content"
-+        android:layout_height="wrap_content"/>
- 
--    <include layout="@layout/settingslib_expressive_preference_text_frame"/>
-+    <include
-+        layout="@layout/settingslib_expressive_preference_text_frame"
-+        android:layout_width="0dp"
-+        android:layout_height="wrap_content"
-+        android:layout_weight="1"/>
- 
-     <!-- Preference should place its actual preference widget here. -->
      <LinearLayout
+         android:layout_width="match_parent"
 diff --git a/packages/SettingsLib/SettingsTheme/res/layout-v36/settingslib_expressive_preference_icon_frame.xml b/packages/SettingsLib/SettingsTheme/res/layout-v36/settingslib_expressive_preference_icon_frame.xml
 index 947f5e00e..1a47b2edb 100644
 --- a/packages/SettingsLib/SettingsTheme/res/layout-v36/settingslib_expressive_preference_icon_frame.xml
@@ -277,19 +194,6 @@ index a987f69f6..df22c55ce 100644
 +        android:layout_height="wrap_content"
          style="?expressivePreferenceTextFrameSummaryStyle" />
  </RelativeLayout>
-diff --git a/packages/SystemUI/src/com/android/systemui/qs/flags/QSComposeFragment.kt b/packages/SystemUI/src/com/android/systemui/qs/flags/QSComposeFragment.kt
-index 8772c51e5..cf94a25b8 100644
---- a/packages/SystemUI/src/com/android/systemui/qs/flags/QSComposeFragment.kt
-+++ b/packages/SystemUI/src/com/android/systemui/qs/flags/QSComposeFragment.kt
-@@ -33,7 +33,7 @@ object QSComposeFragment {
-     /** Is the refactor enabled */
-     @JvmStatic
-     inline val isEnabled
--        get() = Flags.qsUiRefactorComposeFragment()
-+        get() = false
- 
-     /**
-      * Called to ensure code is only run when the flag is enabled. This protects users from the
 diff --git a/packages/SystemUI/src/com/android/systemui/securelockdevice/data/repository/SecureLockDeviceRepository.kt b/packages/SystemUI/src/com/android/systemui/securelockdevice/data/repository/SecureLockDeviceRepository.kt
 index 703430644..4cbefdab7 100644
 --- a/packages/SystemUI/src/com/android/systemui/securelockdevice/data/repository/SecureLockDeviceRepository.kt
@@ -321,23 +225,19 @@ index 703430644..4cbefdab7 100644
              }
          } else {
 diff --git a/services/core/java/com/android/server/am/ProcessList.java b/services/core/java/com/android/server/am/ProcessList.java
-index a421ee65f..119343045 100644
+index d8e2cfaae..bb172064b 100644
 --- a/services/core/java/com/android/server/am/ProcessList.java
 +++ b/services/core/java/com/android/server/am/ProcessList.java
-@@ -2617,14 +2617,9 @@ public final class ProcessList implements ProcessStateController.ProcessLruUpdat
-                         // If we're not told to skip the process group creation, go create it.
-                         final int res = Process.createProcessGroup(uid, startResult.pid);
-                         if (res < 0) {
+@@ -2691,11 +2691,7 @@ public final class ProcessList extends ProcessListInternal
+                             String errorStr = "Unable to create process group for "
+                                 + app.processName + " (uid: " + uid + ", pid: " + startResult.pid
+                                 + "), errno: " + res;
 -                            if (res == -OsConstants.ESRCH) {
--                                Slog.e(ActivityManagerService.TAG,
--                                        "Unable to create process group for "
--                                        + app.processName + " (" + startResult.pid + ")");
+-                                Slog.e(ActivityManagerService.TAG, errorStr);
 -                            } else {
--                                throw new AssertionError("Unable to create process group for "
-+                            Slog.e(ActivityManagerService.TAG,
-+                                    "Unable to create process group for "
-                                     + app.processName + " (" + startResult.pid + ")");
+-                                throw new AssertionError(errorStr);
 -                            }
++                            Slog.e(ActivityManagerService.TAG, errorStr);
                          } else {
                              app.mProcessGroupCreated = true;
                          }
@@ -355,10 +255,10 @@ index 2cadbc58d..0b9435edf 100644
                      + "the Kernel. Cannot monitor CPU without these stats. Terminating CPU monitor "
                      + "service");
 diff --git a/services/core/java/com/android/server/locksettings/LockSettingsService.java b/services/core/java/com/android/server/locksettings/LockSettingsService.java
-index 59e43c22a..6f4a9ca31 100644
+index b0d81fbef..1d14ae36f 100644
 --- a/services/core/java/com/android/server/locksettings/LockSettingsService.java
 +++ b/services/core/java/com/android/server/locksettings/LockSettingsService.java
-@@ -1563,9 +1563,11 @@ public class LockSettingsService extends ILockSettings.Stub {
+@@ -1641,9 +1641,11 @@ public class LockSettingsService extends ILockSettings.Stub {
          try {
              int res = AndroidKeyStoreMaintenance.initUserSuperKeys(userId, password, allowExisting);
              if (res != 0) {
@@ -372,7 +272,7 @@ index 59e43c22a..6f4a9ca31 100644
          } finally {
              ArrayUtils.zeroize(password);
          }
-@@ -1575,6 +1577,8 @@ public class LockSettingsService extends ILockSettings.Stub {
+@@ -1653,6 +1655,8 @@ public class LockSettingsService extends ILockSettings.Stub {
          final byte[] password = sp.deriveKeyStorePassword();
          try {
              mKeyStoreAuthorization.onDeviceUnlocked(userId, password);
@@ -381,7 +281,7 @@ index 59e43c22a..6f4a9ca31 100644
          } finally {
              ArrayUtils.zeroize(password);
          }
-@@ -2294,7 +2298,12 @@ public class LockSettingsService extends ILockSettings.Stub {
+@@ -2465,7 +2469,12 @@ public class LockSettingsService extends ILockSettings.Stub {
                      getGateKeeperService(), getCurrentLskfBasedProtectorId(userId),
                      LockscreenCredential.createNone(), userId, null);
              if (result.syntheticPassword == null) {
@@ -395,7 +295,7 @@ index 59e43c22a..6f4a9ca31 100644
                  return;
              }
              onSyntheticPasswordUnlocked(userId, result.syntheticPassword);
-@@ -3068,7 +3077,7 @@ public class LockSettingsService extends ILockSettings.Stub {
+@@ -3291,7 +3300,7 @@ public class LockSettingsService extends ILockSettings.Stub {
                      LockscreenCredential.createNone(), sp, userId);
              setCurrentLskfBasedProtectorId(protectorId, userId);
              setCeStorageProtection(userId, sp);
@@ -418,25 +318,33 @@ index 468fd5889..5bcd68f2d 100644
      }
  
 diff --git a/services/core/java/com/android/server/locksettings/SyntheticPasswordManager.java b/services/core/java/com/android/server/locksettings/SyntheticPasswordManager.java
-index 70c2281e1..b6bcc9948 100644
+index 6cafb1fe0..c722f492f 100644
 --- a/services/core/java/com/android/server/locksettings/SyntheticPasswordManager.java
 +++ b/services/core/java/com/android/server/locksettings/SyntheticPasswordManager.java
-@@ -1708,13 +1708,18 @@ class SyntheticPasswordManager {
-         if (blob.mProtectorType != expectedProtectorType) {
+@@ -1821,17 +1821,22 @@ class SyntheticPasswordManager {
              throw new IllegalArgumentException("Invalid protector type: " + blob.mProtectorType);
          }
+         SyntheticPassword result = new SyntheticPassword(blob.mVersion);
 -        final byte[] spSecret;
 -        if (blob.mVersion == SYNTHETIC_PASSWORD_VERSION_V1) {
--            spSecret = SyntheticPasswordCrypto.decryptBlobV1(getProtectorKeyAlias(protectorId),
--                    blob.mContent, protectorSecret);
+-            spSecret =
+-                    SyntheticPasswordCrypto.decryptBlobV1(
+-                            mKeyStore,
+-                            getProtectorKeyAlias(protectorId),
+-                            blob.mContent,
+-                            protectorSecret);
 -        } else {
 -            spSecret = decryptSpBlob(getProtectorKeyAlias(protectorId), blob.mContent,
 -                    protectorSecret);
 +        byte[] spSecret = null;
 +        try {
 +            if (blob.mVersion == SYNTHETIC_PASSWORD_VERSION_V1) {
-+                spSecret = SyntheticPasswordCrypto.decryptBlobV1(getProtectorKeyAlias(protectorId),
-+                        blob.mContent, protectorSecret);
++                spSecret =
++                        SyntheticPasswordCrypto.decryptBlobV1(
++                                mKeyStore,
++                                getProtectorKeyAlias(protectorId),
++                                blob.mContent,
++                                protectorSecret);
 +            } else {
 +                spSecret = decryptSpBlob(getProtectorKeyAlias(protectorId), blob.mContent,
 +                        protectorSecret);
@@ -445,8 +353,8 @@ index 70c2281e1..b6bcc9948 100644
 +            Slog.e(TAG, "Exception while decrypting SP blob for user " + userId, e);
 +            spSecret = null;
          }
-         if (spSecret == null) {
-             Slog.e(TAG, "Fail to decrypt SP for user " + userId);
+         try {
+             if (spSecret == null) {
 diff --git a/services/core/java/com/android/server/pm/UserDataPreparer.java b/services/core/java/com/android/server/pm/UserDataPreparer.java
 index a621e8714..c7a490038 100644
 --- a/services/core/java/com/android/server/pm/UserDataPreparer.java
@@ -469,10 +377,10 @@ index a621e8714..c7a490038 100644
              }
          }
 diff --git a/services/core/java/com/android/server/recoverysystem/RecoverySystemService.java b/services/core/java/com/android/server/recoverysystem/RecoverySystemService.java
-index 1ab423d90..b80498a24 100644
+index 4fbbb77ed..bdfc947b8 100644
 --- a/services/core/java/com/android/server/recoverysystem/RecoverySystemService.java
 +++ b/services/core/java/com/android/server/recoverysystem/RecoverySystemService.java
-@@ -533,6 +533,10 @@ public class RecoverySystemService extends IRecoverySystem.Stub implements Reboo
+@@ -535,6 +535,10 @@ public class RecoverySystemService extends IRecoverySystem.Stub implements Reboo
          if (DEBUG) Slog.d(TAG, "rebootRecoveryWithCommand: [" + command + "]");
  
          boolean isForcedWipe = command != null && command.contains(RECOVERY_WIPE_DATA_COMMAND);
@@ -484,10 +392,10 @@ index 1ab423d90..b80498a24 100644
              if (!setupOrClearBcb(true, command)) {
                  Slog.e(TAG, "rebootRecoveryWithCommand failed to setup BCB");
 diff --git a/services/core/java/com/android/server/security/authenticationpolicy/AuthenticationPolicyService.java b/services/core/java/com/android/server/security/authenticationpolicy/AuthenticationPolicyService.java
-index 28ff1f63a..ffebf8edf 100644
+index 474fe17ce..1a1de6e16 100644
 --- a/services/core/java/com/android/server/security/authenticationpolicy/AuthenticationPolicyService.java
 +++ b/services/core/java/com/android/server/security/authenticationpolicy/AuthenticationPolicyService.java
-@@ -595,7 +595,11 @@ public class AuthenticationPolicyService extends SystemService {
+@@ -600,7 +600,11 @@ public class AuthenticationPolicyService extends SystemService {
                  UserHandle user,
                  @NonNull ISecureLockDeviceStatusListener listener
          ) {
@@ -500,7 +408,7 @@ index 28ff1f63a..ffebf8edf 100644
              enforceCrossUserPermission(user, TAG
                      + "#registerSecureLockDeviceStatusListener");
              // Required for internal service to acquire necessary system permissions
-@@ -616,7 +620,11 @@ public class AuthenticationPolicyService extends SystemService {
+@@ -621,7 +625,11 @@ public class AuthenticationPolicyService extends SystemService {
          public void unregisterSecureLockDeviceStatusListener(
                  @NonNull ISecureLockDeviceStatusListener listener
          ) {
@@ -514,7 +422,7 @@ index 28ff1f63a..ffebf8edf 100644
              try {
                  mSecureLockDeviceService.unregisterSecureLockDeviceStatusListener(listener);
 diff --git a/services/permission/java/com/android/server/permission/access/appop/AppOpService.kt b/services/permission/java/com/android/server/permission/access/appop/AppOpService.kt
-index 73f1033f3..48fa5dcbb 100644
+index f4cea89f5..4e48eb92e 100644
 --- a/services/permission/java/com/android/server/permission/access/appop/AppOpService.kt
 +++ b/services/permission/java/com/android/server/permission/access/appop/AppOpService.kt
 @@ -124,11 +124,15 @@ class AppOpService(private val service: AccessCheckingService) : AppOpsCheckingS

@@ -5,14 +5,22 @@ Subject: [PATCH] vold: Treat fsck_msdos exit code 4 as successful repair
 
 Change-Id: I69c0e22948bc38b9138b0bf082ef11e92654da24
 ---
- fs/Vfat.cpp | 9 ++-------
- 1 file changed, 2 insertions(+), 7 deletions(-)
+ fs/Vfat.cpp | 10 ++--------
+ 1 file changed, 2 insertions(+), 8 deletions(-)
 
 diff --git a/fs/Vfat.cpp b/fs/Vfat.cpp
 index 66d6a69..b99264e 100644
 --- a/fs/Vfat.cpp
 +++ b/fs/Vfat.cpp
-@@ -91,13 +91,8 @@ status_t Check(const std::string& source) {
+@@ -58,7 +58,6 @@ bool IsSupported() {
+ }
+ 
+ status_t Check(const std::string& source) {
+-    int pass = 1;
+     int rc = 0;
+     do {
+         std::vector<std::string> cmd;
+@@ -91,13 +92,8 @@ status_t Check(const std::string& source) {
                  return -1;
  
              case 4:
