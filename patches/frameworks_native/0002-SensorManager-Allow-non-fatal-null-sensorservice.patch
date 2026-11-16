@@ -1,5 +1,5 @@
 diff --git a/libs/sensor/SensorManager.cpp b/libs/sensor/SensorManager.cpp
-index 7b4a86c..ae9368a 100644
+index 7b4a86c..7660a1a 100644
 --- a/libs/sensor/SensorManager.cpp
 +++ b/libs/sensor/SensorManager.cpp
 @@ -123,7 +123,7 @@ SensorManager& SensorManager::getInstanceForPackage(const String16& packageName)
@@ -75,31 +75,7 @@ index 7b4a86c..ae9368a 100644
          return static_cast<ssize_t>(err);
      }
      *list = mSensorList;
-@@ -274,6 +270,7 @@ ssize_t SensorManager::getDefaultDeviceSensorList(Vector<Sensor> & list) {
-     Mutex::Autolock _l(mLock);
-     status_t err = assertStateLocked();
-     if (err < 0) {
-+        if (list) *list = nullptr;
-         return static_cast<ssize_t>(err);
-     }
- 
-@@ -290,6 +287,7 @@ ssize_t SensorManager::getDynamicSensorList(Vector<Sensor> & dynamicSensors) {
-     Mutex::Autolock _l(mLock);
-     status_t err = assertStateLocked();
-     if (err < 0) {
-+        if (list) *list = nullptr;
-         return static_cast<ssize_t>(err);
-     }
- 
-@@ -303,6 +301,7 @@ ssize_t SensorManager::getRuntimeSensorList(int deviceId, Vector<Sensor>& runtim
-     Mutex::Autolock _l(mLock);
-     status_t err = assertStateLocked();
-     if (err < 0) {
-+        if (list) *list = nullptr;
-         return static_cast<ssize_t>(err);
-     }
- 
-@@ -316,6 +315,7 @@ ssize_t SensorManager::getDynamicSensorList(Sensor const* const** list) {
+@@ -316,6 +312,7 @@ ssize_t SensorManager::getDynamicSensorList(Sensor const* const** list) {
      Mutex::Autolock _l(mLock);
      status_t err = assertStateLocked();
      if (err < 0) {
