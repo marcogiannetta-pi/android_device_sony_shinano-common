@@ -391,6 +391,21 @@ index 4fbbb77ed..bdfc947b8 100644
          synchronized (sRequestLock) {
              if (!setupOrClearBcb(true, command)) {
                  Slog.e(TAG, "rebootRecoveryWithCommand failed to setup BCB");
+diff --git a/services/core/java/com/android/server/security/advancedprotection/AdvancedProtectionConfigLoader.java b/services/core/java/com/android/server/security/advancedprotection/AdvancedProtectionConfigLoader.java
+index d2eb8e8fb..d721e046f 100644
+--- a/services/core/java/com/android/server/security/advancedprotection/AdvancedProtectionConfigLoader.java
++++ b/services/core/java/com/android/server/security/advancedprotection/AdvancedProtectionConfigLoader.java
+@@ -131,7 +131,9 @@ public class AdvancedProtectionConfigLoader {
+         }
+         Boolean featureFlagValue = AconfigFlags.getInstance().getFlagValue(featureFlag);
+         if (featureFlagValue == null) {
+-            throw new IllegalArgumentException("Invalid feature flag: " + featureFlag);
++            android.util.Slog.w("AdvancedProtectionConfigLoader",
++                    "Unknown feature flag: " + featureFlag + ", treating as disabled");
++            return false;
+         }
+         return negated ? !featureFlagValue : featureFlagValue;
+     }
 diff --git a/services/core/java/com/android/server/security/authenticationpolicy/AuthenticationPolicyService.java b/services/core/java/com/android/server/security/authenticationpolicy/AuthenticationPolicyService.java
 index 474fe17ce..1a1de6e16 100644
 --- a/services/core/java/com/android/server/security/authenticationpolicy/AuthenticationPolicyService.java

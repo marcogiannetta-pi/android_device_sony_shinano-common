@@ -40,6 +40,7 @@ declare -A PATCH_MAP=(
     ["packages_modules_Connectivity"]="packages/modules/Connectivity"
     ["packages_modules_CrashRecovery"]="packages/modules/CrashRecovery"
     ["packages_modules_DnsResolver"]="packages/modules/DnsResolver"
+    ["packages_modules_NetworkStack"]="packages/modules/NetworkStack"
     ["packages_modules_Permission"]="packages/modules/Permission"
     ["system_core"]="system/core"
     ["system_hwservicemanager"]="system/hwservicemanager"

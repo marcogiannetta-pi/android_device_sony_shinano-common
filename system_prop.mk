@@ -79,12 +79,15 @@ PRODUCT_PROPERTY_OVERRIDES += \
     ro.lmk.use_minfree_levels=true \
     ro.lmk.downgrade_pressure=100 \
     dalvik.vm.dex2oat-threads=2 \
-    dalvik.vm.boot-dex2oat-threads=4
+    dalvik.vm.boot-dex2oat-threads=4 \
+    ro.dalvik.vm.enable_uffd_gc=false
 
 # Graphics & SurfaceFlinger
 PRODUCT_PROPERTY_OVERRIDES += \
     ro.surface_flinger.supports_background_blur=0 \
+    persist.sys.sf.disable_blurs=1 \
     persist.sysui.disableBlur=true \
+    ro.launcher.blur.appLaunch=0 \
     debug.sf.disable_backpressure=1 \
     debug.sf.latch_unsignaled=1
 

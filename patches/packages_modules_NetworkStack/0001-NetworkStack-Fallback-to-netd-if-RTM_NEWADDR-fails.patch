@@ -1,0 +1,23 @@
+diff --git a/src/android/net/ip/IpClient.java b/src/android/net/ip/IpClient.java
+index e5927c0..243a0a3 100644
+--- a/src/android/net/ip/IpClient.java
++++ b/src/android/net/ip/IpClient.java
+@@ -3953,7 +3953,7 @@ public class IpClient extends StateMachine {
+ 
+                 case DhcpClient.CMD_CONFIGURE_LINKADDRESS: {
+                     final LinkAddress ipAddress = (LinkAddress) msg.obj;
+-                    final boolean success;
++                    boolean success = false;
+                     if (mPopulateLinkAddressLifetime) {
+                         // For IPv4 link addresses, there is no concept of preferred/valid
+                         // lifetimes. Populate the ifa_cacheinfo attribute in the netlink
+@@ -3967,7 +3967,8 @@ public class IpClient extends StateMachine {
+                                 (byte) RT_SCOPE_UNIVERSE /* scope */,
+                                 leaseDuration /* preferred */,
+                                 leaseDuration /* valid */);
+-                    } else {
++                    }
++                    if (!success) {
+                         success = mInterfaceCtrl.setIPv4Address(ipAddress);
+                     }
+                     if (success) {

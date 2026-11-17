@@ -381,6 +381,83 @@ index 70991eb..d1b7e4a 100644
  }
  
  #undef V
+diff --git a/service/native/libs/libeventpolling/LocalNetEventHandler.cpp b/service/native/libs/libeventpolling/LocalNetEventHandler.cpp
+index 59c2844..ac05500 100644
+--- a/service/native/libs/libeventpolling/LocalNetEventHandler.cpp
++++ b/service/native/libs/libeventpolling/LocalNetEventHandler.cpp
+@@ -18,6 +18,7 @@
+ #include "libeventpolling/LocalNetEventHandler.h"
+ 
+ #include <memory>
++#include <unistd.h>
+ #include <vector>
+ 
+ #include <bpf/BpfRingbuf.h>
+@@ -36,6 +37,11 @@ using bpf::RingbufEventPoller;
+ LocalNetEventHandler::LocalNetEventRingbuf *LocalNetEventHandler::GetRingbuf() {
+     static LocalNetEventRingbuf *const sRingbuf =
+         []() -> LocalNetEventRingbuf * {
++        if (access(LOCAL_NET_NOTE_OP_RINGBUF_PATH, F_OK) != 0) {
++            ALOGW("BPF ringbuf %s not available, skipping LocalNetEventHandler",
++                  LOCAL_NET_NOTE_OP_RINGBUF_PATH);
++            return nullptr;
++        }
+         auto rb = std::make_unique<LocalNetEventRingbuf>(
+             LOCAL_NET_NOTE_OP_RINGBUF_PATH);
+         return rb.release();
+@@ -45,9 +51,13 @@ LocalNetEventHandler::LocalNetEventRingbuf *LocalNetEventHandler::GetRingbuf() {
+ 
+ // static
+ std::vector<uint32_t> LocalNetEventHandler::ConsumeAll() {
++    auto *rb = GetRingbuf();
++    if (!rb) {
++        return {};
++    }
+     std::vector<uint32_t> uids_pids;
+     base::Result<int> ret =
+-        GetRingbuf()->ConsumeAll([&](const LocalNetNoteOp &event) {
++        rb->ConsumeAll([&](const LocalNetNoteOp &event) {
+             uids_pids.push_back(event.uid);
+             uids_pids.push_back(event.pid);
+         });
+diff --git a/service/native/libs/libeventpolling/LoopbackEventHandler.cpp b/service/native/libs/libeventpolling/LoopbackEventHandler.cpp
+index 942bbf6..062bf62 100644
+--- a/service/native/libs/libeventpolling/LoopbackEventHandler.cpp
++++ b/service/native/libs/libeventpolling/LoopbackEventHandler.cpp
+@@ -18,6 +18,7 @@
+ #include "libeventpolling/LoopbackEventHandler.h"
+ 
+ #include <memory>
++#include <unistd.h>
+ 
+ #include <bpf/BpfRingbuf.h>
+ #include <bpf/BpfUtils.h>
+@@ -53,6 +54,11 @@ bpf::RingbufEventPoller<LoopbackAccessEvent> *
+ LoopbackEventHandler::GetPoller() {
+     static bpf::RingbufEventPoller<LoopbackAccessEvent> *const sPoller =
+         []() -> bpf::RingbufEventPoller<LoopbackAccessEvent> * {
++        if (access(LOOPBACK_ACCESS_RINGBUF_NETD_PATH, F_OK) != 0) {
++            ALOGW("BPF ringbuf %s not available, skipping LoopbackEventHandler",
++                  LOOPBACK_ACCESS_RINGBUF_NETD_PATH);
++            return nullptr;
++        }
+         auto rb = std::make_unique<BpfRingbuf<LoopbackAccessEvent>>(
+             LOOPBACK_ACCESS_RINGBUF_NETD_PATH);
+ 
+diff --git a/service/native/libs/libeventpolling/include/libeventpolling/LocalNetEventHandler.h b/service/native/libs/libeventpolling/include/libeventpolling/LocalNetEventHandler.h
+index ce46620..ba02e32 100644
+--- a/service/native/libs/libeventpolling/include/libeventpolling/LocalNetEventHandler.h
++++ b/service/native/libs/libeventpolling/include/libeventpolling/LocalNetEventHandler.h
+@@ -36,7 +36,8 @@ class LocalNetEventHandler {
+     // Returns a duplicate of the ring buffer file descriptor. This is needed so
+     // we can pass the file descriptor via jni for use in polling in java.
+     static android::base::unique_fd GetNewRingbufFd() {
+-        return GetRingbuf()->GetDuplicateFd();
++        auto *rb = GetRingbuf();
++        return rb ? rb->GetDuplicateFd() : android::base::unique_fd();
+     }
+ 
+     // Consumes all available events in the ring buffer. Returns a list of
 diff --git a/service/src/com/android/server/BpfNetMaps.java b/service/src/com/android/server/BpfNetMaps.java
 index c1a4799..25d7487 100644
 --- a/service/src/com/android/server/BpfNetMaps.java
@@ -778,6 +855,19 @@ index c1a4799..25d7487 100644
          }
  
          // After changing the config, it's needed to make sure all the current running eBPF
+diff --git a/service/src/com/android/server/connectivity/LocalNetEventListener.java b/service/src/com/android/server/connectivity/LocalNetEventListener.java
+index e8d495c..3113537 100644
+--- a/service/src/com/android/server/connectivity/LocalNetEventListener.java
++++ b/service/src/com/android/server/connectivity/LocalNetEventListener.java
+@@ -98,7 +98,7 @@ public class LocalNetEventListener {
+         if (mStarted) {
+             return;
+         }
+-        if (mMetricsEnabled || mNoteOpsEnabled) {
++        if (mRingbufFd != null && mRingbufFd.valid() && (mMetricsEnabled || mNoteOpsEnabled)) {
+             mLooper.getQueue().addOnFileDescriptorEventListener(mRingbufFd,
+                     EVENT_INPUT | EVENT_ERROR, this::consumeEvents);
+         }
 diff --git a/staticlibs/device/com/android/net/module/util/BpfDump.java b/staticlibs/device/com/android/net/module/util/BpfDump.java
 index d79f52e..ba671f0 100644
 --- a/staticlibs/device/com/android/net/module/util/BpfDump.java
