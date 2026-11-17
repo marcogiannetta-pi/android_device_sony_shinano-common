@@ -1,0 +1,44 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: mgiannetta <marcogiannetta96@gmail.com>
+Date: Tue, 17 Nov 2026 14:02:00 +0100
+Subject: [PATCH] charger: Use in-process Health default to avoid HIDL deadlock
+
+During early charger mode boot, charger and android.hardware.health@2.1-service
+start concurrently while hwservicemanager is still loading VINTF manifests,
+which can deadlock both in binder_thread_read. Use the in-process
+V2_1::implementation::Health directly instead of querying hwservicemanager.
+
+---
+ healthd/charger_utils.cpp | 19 ++++++-------------
+ 1 file changed, 6 insertions(+), 13 deletions(-)
+
+diff --git a/healthd/charger_utils.cpp b/healthd/charger_utils.cpp
+index 8bbfb4e..37062b0 100644
+--- a/healthd/charger_utils.cpp
++++ b/healthd/charger_utils.cpp
+@@ -26,19 +26,12 @@ namespace hardware {
+ namespace health {
+ 
+ sp<V2_1::IHealth> GetHealthServiceOrDefault() {
+-    // No need to use get_health_service from libhealthhalutils that
+-    // checks for "backup" instance provided by healthd, since
+-    // V2_1::implementation::Health does the same thing.
+-    sp<V2_1::IHealth> service = V2_1::IHealth::getService();
+-    if (service != nullptr) {
+-        LOG(INFO) << "Charger uses health HAL service.";
+-    } else {
+-        LOG(WARNING) << "Charger uses system defaults.";
+-        auto config = std::make_unique<healthd_config>();
+-        InitHealthdConfig(config.get());
+-        service = new V2_1::implementation::Health(std::move(config));
+-    }
+-    return service;
++    // Use the in-process default Health implementation directly in charger mode
++    // to avoid HIDL/hwservicemanager binder deadlocks during early charger boot.
++    LOG(INFO) << "Charger uses in-process system defaults.";
++    auto config = std::make_unique<healthd_config>();
++    InitHealthdConfig(config.get());
++    return new V2_1::implementation::Health(std::move(config));
+ }
+ 
+ }  // namespace health
